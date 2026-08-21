@@ -32,9 +32,28 @@ if (semua.length === 0) {
   process.exit(1);
 }
 
+/**
+ * Menyetarakan sintaks nilai bawaan waktu.
+ *
+ * drizzle-kit menulis `DEFAULT (CURRENT_TIMESTAMP(3))` memakai tanda kurung.
+ * Bentuk itu adalah "nilai bawaan berupa ekspresi" yang baru ada sejak MySQL
+ * 8.0.13; versi yang lebih tua menolaknya dengan galat sintaks. Versi database
+ * di Hostinger belum diverifikasi, jadi bentuk yang lebih tua yang dipakai.
+ *
+ * Tanpa kurung diterima MySQL 5.6 ke atas maupun seluruh MariaDB, dengan arti
+ * yang persis sama. Lagi pula nilai bawaan ini cuma jaring pengaman - seluruh
+ * timestamp dipasok Node dalam UTC lewat `$defaultFn`, bukan oleh MySQL.
+ */
+function setarakan(sql) {
+  return sql.replace(
+    /DEFAULT \(CURRENT_TIMESTAMP(\(\d\))?\)/gi,
+    (_cocok, presisi) => `DEFAULT CURRENT_TIMESTAMP${presisi ?? ""}`
+  );
+}
+
 /** Membuang penanda breakpoint agar isinya bisa dijalankan apa adanya. */
 function bersihkan(namaBerkas) {
-  return readFileSync(join(dirMigrations, namaBerkas), "utf8")
+  return setarakan(readFileSync(join(dirMigrations, namaBerkas), "utf8"))
     .split(/-->\s*statement-breakpoint/)
     .map((bagian) => bagian.trim())
     .filter(Boolean)

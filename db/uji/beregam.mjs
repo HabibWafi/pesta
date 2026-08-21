@@ -213,6 +213,23 @@ async function main() {
   lapor("worker A mendapat antrean", idA.length > 0, `${idA.length} item`);
   lapor("worker B TIDAK mendapat item yang sama", idB.filter((i) => idA.includes(i)).length === 0);
 
+  // Antrean tanpa jadwal berarti "kirim secepatnya", dan harus ikut terjemput.
+  //
+  // Uji ini ada karena kasusnya pernah lolos: uji di atas selalu mengisi
+  // scheduled_at, sehingga cabang NULL tidak pernah tersentuh. Di SQL,
+  // `NULL <= sekarang` bernilai NULL - bukan benar - jadi barisnya diam di
+  // status pending selamanya tanpa galat, tanpa percobaan ulang, tanpa jejak
+  // di log. Warga menunggu balasan yang tidak akan pernah datang.
+  sql(`UPDATE pesta.beregam_outbox SET status='pending', locked_by=NULL, locked_at=NULL, scheduled_at=NULL WHERE contact_id=${kontakId};`);
+  // Wajib memakai worker-A: hanya pemegang sewa yang dilayani /outbox, jadi
+  // worker lain akan dapat nol karena sewanya, bukan karena jadwalnya.
+  const tanpaJadwal = await worker("/outbox?limit=5", { workerId: "worker-A" });
+  lapor(
+    "antrean tanpa scheduled_at tetap terjemput",
+    ((tanpaJadwal.body.items ?? []).length) > 0,
+    `${(tanpaJadwal.body.items ?? []).length} item`
+  );
+
   // === J. Heartbeat & pemeliharaan ========================================
   console.log("\nJ. HEARTBEAT & PEMELIHARAAN");
   const hb1 = await worker("/heartbeat", { method: "POST", body: { workerId: "worker-A", waSessionStatus: "WORKING", uptime: 120 } });

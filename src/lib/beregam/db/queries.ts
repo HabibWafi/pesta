@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   beregamAiJobs,
@@ -133,9 +133,21 @@ export async function claimOutboxBatch(
       .where(
         and(
           eq(beregamOutbox.status, "pending"),
-          lte(beregamOutbox.scheduledAt, new Date())
+          // `scheduled_at` boleh NULL, artinya "kirim secepatnya".
+          //
+          // Tanpa cabang IS NULL, baris semacam itu tidak akan pernah
+          // terjemput: di SQL, `NULL <= sekarang` bernilai NULL, bukan benar.
+          // Barisnya diam di status `pending` selamanya - tanpa galat, tanpa
+          // percobaan ulang, tanpa jejak apa pun di log. Warga menunggu
+          // balasan yang tidak akan datang, dan tidak ada yang tahu.
+          or(
+            isNull(beregamOutbox.scheduledAt),
+            lte(beregamOutbox.scheduledAt, new Date())
+          )
         )
       )
+      // NULL diurutkan lebih dulu oleh MySQL, jadi pesan "kirim secepatnya"
+      // memang mendapat giliran paling awal - persis yang diinginkan.
       .orderBy(asc(beregamOutbox.scheduledAt), asc(beregamOutbox.id))
       .limit(batas)
       .for("update");
