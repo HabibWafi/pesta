@@ -71,6 +71,13 @@ hPanel → **Website** → **Node.js** → aplikasi PESTA → **Environment Vari
 | `APP_TZ` | `Asia/Jakarta` | |
 | `GOOGLE_MAPS_EMBED_KEY` | *(boleh kosong)* | Kosong pun peta Google tetap tampil |
 
+**Variabel Beregam belum perlu diisi sekarang.** Selama `BEREGAM_API_KEY` dan
+`BEREGAM_WEBHOOK_HMAC` kosong, seluruh route `/api/beregam/*` membalas **503
+"Modul Beregam belum dikonfigurasi di server ini."** Itu perilaku yang
+disengaja: kode bot boleh ter-deploy lebih dulu tanpa menyalakan apa pun, dan
+halaman publik sama sekali tidak terpengaruh. Isi variabelnya nanti, saat
+worker di PC kantor sudah siap disambungkan.
+
 > **Jangan membuat berkas `.env.production` di server.** Next.js memuatnya
 > dengan prioritas lebih tinggi daripada `.env`, dan pernah menyebabkan
 > koneksi database tertimpa nilai placeholder di komputer pengembangan.
@@ -100,6 +107,7 @@ Migration yang dijalankan:
 | `0002_konten_landing` | Tabel `site_settings`, `testimonials`, `faqs` |
 | `0003_analitik_pengunjung` | Tabel `analytics_events`, `analytics_daily` |
 | `0004_analitik_per_halaman` | Tabel `analytics_path_daily` |
+| `0005_beregam_fondasi` | 14 tabel berprefiks `beregam_` untuk bot WhatsApp |
 
 > Migration **tidak pernah** dijalankan lewat CLI di server, dan **jangan**
 > membuat endpoint migration sekali-pakai di aplikasi. Endpoint semacam itu
@@ -112,9 +120,17 @@ Verifikasi setelah selesai:
 SHOW TABLES;
 ```
 
-Harus ada **10 tabel**: `users`, `vidcon_requests`, `pengaduans`, `contacts`,
-`site_settings`, `testimonials`, `faqs`, `analytics_events`,
-`analytics_daily`, `analytics_path_daily`.
+Harus ada **24 tabel**: 10 tabel inti - `users`, `vidcon_requests`,
+`pengaduans`, `contacts`, `site_settings`, `testimonials`, `faqs`,
+`analytics_events`, `analytics_daily`, `analytics_path_daily` - ditambah
+14 tabel berprefiks `beregam_`.
+
+> **Nilai bawaan waktu sengaja ditulis tanpa tanda kurung.** drizzle-kit
+> menghasilkan `DEFAULT (CURRENT_TIMESTAMP(3))`, bentuk "nilai bawaan berupa
+> ekspresi" yang baru ada sejak MySQL 8.0.13. `npm run db:sql` mengubahnya
+> menjadi bentuk tanpa kurung yang diterima MySQL 5.6 ke atas maupun seluruh
+> MariaDB, dengan arti yang sama persis. Jangan menyalin berkas di
+> `db/migrations/` mentah-mentah ke phpMyAdmin - lewati selalu `npm run db:sql`.
 
 ---
 
