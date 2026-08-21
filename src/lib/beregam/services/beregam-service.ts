@@ -218,6 +218,20 @@ export class BeregamService {
 
     const pilihan = menu.filter((m) => m.menuKey && !m.parentKey);
 
+    // Menu kosong berarti tabel beregam_faq belum diisi di server ini -
+    // biasanya karena seeder belum dijalankan setelah deploy. Tanpa cabang
+    // ini warga menerima sapaan lalu "Silakan balas dengan angka" tanpa satu
+    // pun angka di bawahnya, dan tidak ada yang tahu harus mengetik apa.
+    // Lebih baik langsung dilempar ke petugas daripada dibiarkan menebak.
+    if (pilihan.length === 0) {
+      console.error(
+        "[beregam] beregam_faq kosong - menu tidak bisa disusun. " +
+          "Jalankan: npm run db:seed:beregam"
+      );
+      await this.escalate(contact, "menu bot belum tersedia");
+      return;
+    }
+
     const baris = pilihan.map((m) => `${m.menuKey}. ${m.title}`);
     const header = opsi.sapa
       ? `${SAPAAN}\n\nSilakan balas dengan *angka*:`
