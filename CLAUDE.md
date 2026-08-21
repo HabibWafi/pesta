@@ -75,8 +75,10 @@ Rancangan lengkap ada di `docs/plan.docx` pada repo `beregam`.
 
 ## Arsitektur Beregam
 
-- Engine WhatsApp (**OpenWA**, `ENGINE_TYPE=baileys`, `127.0.0.1:2785`) ada di
-  PC kantor dan **TIDAK bisa dijangkau dari Hostinger**
+- Engine WhatsApp (**WAHA**, engine `NOWEB` = baileys tanpa Chromium,
+  `127.0.0.1:3001`) ada di PC kantor dan **TIDAK bisa dijangkau dari
+  Hostinger**. Rancangan awal memilih OpenWA, tetapi image-nya hanya punya
+  tag `latest` sehingga aturan "kunci ke versi" mustahil dipenuhi.
 - **PESTA tidak pernah mengirim pesan WhatsApp.** PESTA menulis baris ke
   `beregam_outbox`; worker di PC yang mengambil dan mengirim
 - Berlaku sama untuk AI: PESTA menulis `beregam_ai_jobs`, AI worker memproses
