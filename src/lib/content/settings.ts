@@ -62,7 +62,9 @@ export const DEFINISI_SETTING = {
     label: "Jenis peta",
     jenis: "pilihan",
     bantuan:
-      "Google Hybrid butuh GOOGLE_MAPS_EMBED_KEY. Bila key kosong, otomatis memakai OpenStreetMap.",
+      "Google Hybrid tampil seperti saat membuka Google Maps. Tanpa API key " +
+      "pun tetap jalan lewat embed klasik; isi GOOGLE_MAPS_EMBED_KEY di .env " +
+      "bila ingin memakai jalur resmi yang lebih stabil.",
     pilihan: [
       { nilai: "google", label: "Google Hybrid (satelit + label)" },
       { nilai: "osm", label: "OpenStreetMap (tanpa API key, tanpa pelacakan)" },

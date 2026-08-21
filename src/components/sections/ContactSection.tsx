@@ -169,55 +169,66 @@ export default function ContactSection({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-          {/* Left Column: Office Details */}
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:items-stretch">
+          {/* Kolom kiri: informasi kantor + peta */}
+          <div className="flex flex-col gap-4">
             <h3 className="text-xl font-bold text-slate-900">
               Pelayanan Statistik Terpadu (PST)
             </h3>
 
-            <div className="space-y-4 text-sm text-slate-700">
-              <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-                <div className="p-2.5 rounded-xl bg-indigo-100 text-indigo-600 shrink-0">
-                  <MapPin className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-900">Alamat Kantor</h4>
-                  <p className="text-slate-600 mt-0.5">{pengaturan["kontak.alamat"]}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-                <div className="p-2.5 rounded-xl bg-cyan-100 text-cyan-600 shrink-0">
-                  <Mail className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-900">Email Resmi</h4>
-                  <p className="text-slate-600">{pengaturan["kontak.email"]}</p>
+            {/*
+              Satu kartu ringkas, bukan empat kartu bertumpuk. Versi lama
+              membuat kolom kiri jauh lebih tinggi daripada formulir di
+              sebelahnya, sehingga barisnya terlihat pincang.
+            */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 divide-y divide-slate-200/80 text-sm">
+              <div className="flex items-start gap-3 p-3.5">
+                <MapPin className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="font-bold text-slate-900 text-xs">Alamat Kantor</p>
+                  <p className="text-slate-600 text-[13px] leading-snug mt-0.5">
+                    {pengaturan["kontak.alamat"]}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-                <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-600 shrink-0">
-                  <Phone className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-900">Telepon Kantor</h4>
-                  <p className="text-slate-600">{pengaturan["kontak.telepon"]}</p>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80">
+                <a
+                  href={`mailto:${pengaturan["kontak.email"]}`}
+                  className="flex items-start gap-3 p-3.5 hover:bg-slate-100/70 transition-colors"
+                >
+                  <Mail className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 text-xs">Email Resmi</p>
+                    <p className="text-slate-600 text-[13px] truncate">{pengaturan["kontak.email"]}</p>
+                  </div>
+                </a>
+
+                <a
+                  href={`tel:${pengaturan["kontak.telepon"].replace(/[^0-9+]/g, "")}`}
+                  className="flex items-start gap-3 p-3.5 hover:bg-slate-100/70 transition-colors"
+                >
+                  <Phone className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 text-xs">Telepon Kantor</p>
+                    <p className="text-slate-600 text-[13px] truncate">{pengaturan["kontak.telepon"]}</p>
+                  </div>
+                </a>
               </div>
 
-              <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-                <div className="p-2.5 rounded-xl bg-amber-100 text-amber-600 shrink-0">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-900">Jam Layanan PST</h4>
-                  <p className="text-slate-600 whitespace-pre-line">{pengaturan["kontak.jam_layanan"]}</p>
+              <div className="flex items-start gap-3 p-3.5">
+                <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="font-bold text-slate-900 text-xs">Jam Layanan PST</p>
+                  <p className="text-slate-600 text-[13px] leading-snug whitespace-pre-line mt-0.5">
+                    {pengaturan["kontak.jam_layanan"]}
+                  </p>
                 </div>
               </div>
+            </div>
 
-              {tampilPeta && (
+            {tampilPeta && (
+              <div className="flex-1 min-h-[200px]">
                 <PetaLokasi
                   lat={pengaturan["peta.lat"]}
                   lng={pengaturan["peta.lng"]}
@@ -226,8 +237,8 @@ export default function ContactSection({
                   jenis={pengaturan["peta.jenis"]}
                   googleKey={googleMapsKey}
                 />
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Right Column: Contact Form */}
