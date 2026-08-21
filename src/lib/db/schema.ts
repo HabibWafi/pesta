@@ -1,4 +1,4 @@
-import { mysqlTable, int, varchar, text, datetime, unique } from "drizzle-orm/mysql-core";
+import { mysqlTable, int, varchar, text, datetime, json, unique } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
 
@@ -85,6 +85,18 @@ export const vidconRequests = mysqlTable("vidcon_requests", {
   /** PENDING | APPROVED | REJECTED | COMPLETED */
   status: varchar("status", { length: 20 }).default("PENDING").notNull(),
   catatanAdmin: text("catatan_admin"),
+
+  /**
+   * Kebutuhan pendampingan inklusif, disimpan sebagai array JSON.
+   *
+   * Array karena UU No. 8/2016 Pasal 4 menyatakan disabilitas bisa dialami
+   * tunggal, ganda, atau multi - satu warga bisa butuh lebih dari satu
+   * bentuk pendampingan sekaligus. Daftar nilainya di src/lib/schemas/inklusi.ts
+   */
+  layananInklusif: json("layanan_inklusif").$type<string[]>(),
+  /** Penjelasan bebas bila memilih LAINNYA. */
+  layananInklusifCatatan: text("layanan_inklusif_catatan"),
+
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

@@ -20,16 +20,18 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+import type { VidconRequest } from "@/lib/db/schema";
+import { labelInklusif } from "@/lib/schemas/inklusi";
 
 type SortField = "nama" | "cakupan" | "tanggal" | "status";
 type SortOrder = "asc" | "desc";
 
 export default function AdminVidconPage() {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<VidconRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<VidconRequest | null>(null);
   const [editStatus, setEditStatus] = useState("APPROVED");
   const [catatan, setCatatan] = useState("");
   const [updating, setUpdating] = useState(false);
@@ -90,15 +92,15 @@ export default function AdminVidconPage() {
 
   // Sorted Items
   const sortedItems = useMemo(() => {
+    // Semua medan sortir di halaman ini bertipe teks (nama, cakupan,
+    // tanggal sebagai string YYYY-MM-DD, status), jadi cukup dibandingkan
+    // sebagai teks tanpa peka huruf besar-kecil.
+    const kunci = (item: VidconRequest): string =>
+      String(item[sortField] ?? "").toLowerCase();
+
     return [...items].sort((a, b) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
-
-      if (typeof aVal === "string") {
-        aVal = aVal.toLowerCase();
-        bVal = (bVal || "").toLowerCase();
-      }
-
+      const aVal = kunci(a);
+      const bVal = kunci(b);
       if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
       if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
       return 0;
@@ -296,16 +298,21 @@ export default function AdminVidconPage() {
                         <p className="font-bold text-slate-900 dark:text-white text-xs truncate" title={item.nama}>
                           {item.nama}
                         </p>
-                        {item.deskripsi?.toLowerCase().includes("tuna rungu") || item.layananInklusif === "TUNA_RUNGU" ? (
-                          <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-extrabold text-[9px] border border-emerald-300">
-                            👂 JBI / TUNA RUNGU
+                        {/*
+                          Dibaca dari kolom layanan_inklusif, bukan ditebak
+                          dari teks deskripsi. Tebakan lama itu penanganan
+                          darurat karena isian aslinya tidak pernah sampai
+                          ke database.
+                        */}
+                        {labelInklusif(item.layananInklusif).map((label) => (
+                          <span
+                            key={label}
+                            className="px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-extrabold text-[9px] border border-emerald-300"
+                            title="Permohonan ini meminta pendampingan inklusif - beri prioritas"
+                          >
+                            {label}
                           </span>
-                        ) : null}
-                        {item.deskripsi?.toLowerCase().includes("lansia") || item.layananInklusif === "LANSIA" ? (
-                          <span className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-extrabold text-[9px] border border-amber-300">
-                            👴 LANSIA
-                          </span>
-                        ) : null}
+                        ))}
                       </div>
                       <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-300 truncate mt-0.5" title={item.asalInstansi}>
                         <Building className="w-3 h-3 text-indigo-500 dark:text-indigo-400 shrink-0" />
@@ -433,8 +440,17 @@ export default function AdminVidconPage() {
 
             <div className="text-xs space-y-1 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
               <p><strong className="text-slate-900 dark:text-white">Pemohon:</strong> {selectedItem.nama} ({selectedItem.asalInstansi})</p>
+              <p><strong className="text-slate-900 dark:text-white">Kontak:</strong> {selectedItem.email} &middot; {selectedItem.noHp}</p>
+              <p><strong className="text-slate-900 dark:text-white">Alamat:</strong> {selectedItem.alamat}</p>
               <p><strong className="text-slate-900 dark:text-white">Jadwal:</strong> {selectedItem.tanggal} jam {selectedItem.jam} WIB</p>
               <p><strong className="text-slate-900 dark:text-white">Topik:</strong> {selectedItem.cakupan}</p>
+              {labelInklusif(selectedItem.layananInklusif).length > 0 && (
+                <p className="pt-1 mt-1 border-t border-slate-200 dark:border-slate-700">
+                  <strong className="text-emerald-700 dark:text-emerald-400">Pendampingan inklusif:</strong>{" "}
+                  {labelInklusif(selectedItem.layananInklusif).join(", ")}
+                  {selectedItem.layananInklusifCatatan ? ` - ${selectedItem.layananInklusifCatatan}` : ""}
+                </p>
+              )}
             </div>
 
             <div>

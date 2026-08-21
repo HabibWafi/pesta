@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+import type { Pengaduan } from "@/lib/db/schema";
 
 type SortField = "nama" | "kategori" | "createdAt" | "status";
 type SortOrder = "asc" | "desc";
@@ -42,11 +43,11 @@ function formatWhatsAppNumber(phone: string): string {
 }
 
 export default function AdminPengaduanPage() {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<Pengaduan[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<Pengaduan | null>(null);
   const [editStatus, setEditStatus] = useState("RESOLVED");
   const [tanggapan, setTanggapan] = useState("");
   const [updating, setUpdating] = useState(false);
@@ -107,18 +108,16 @@ export default function AdminPengaduanPage() {
 
   // Sorted Items
   const sortedItems = useMemo(() => {
+    // Nilai pembanding dinormalkan lebih dulu supaya tanggal dibandingkan
+    // sebagai angka dan teks dibandingkan tanpa peka huruf besar-kecil.
+    const kunci = (item: Pengaduan): number | string =>
+      sortField === "createdAt"
+        ? new Date(item.createdAt).getTime()
+        : String(item[sortField] ?? "").toLowerCase();
+
     return [...items].sort((a, b) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
-
-      if (sortField === "createdAt") {
-        aVal = new Date(a.createdAt).getTime();
-        bVal = new Date(b.createdAt).getTime();
-      } else if (typeof aVal === "string") {
-        aVal = aVal.toLowerCase();
-        bVal = (bVal || "").toLowerCase();
-      }
-
+      const aVal = kunci(a);
+      const bVal = kunci(b);
       if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
       if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
       return 0;
@@ -360,7 +359,21 @@ export default function AdminPengaduanPage() {
                         <User className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                         <span className="truncate">{item.nama}</span>
                       </p>
-                      {renderKontakInfo(item.email)}
+                      <p className="text-[11px] text-slate-500 dark:text-slate-300 truncate flex items-center gap-1 mt-0.5" title={item.email}>
+                        <Mail className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span className="truncate">{item.email}</span>
+                      </p>
+                      {item.noHp && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-300 truncate flex items-center gap-1 mt-0.5" title={item.noHp}>
+                          <Phone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span className="truncate">{item.noHp}</span>
+                        </p>
+                      )}
+                      {item.asalInstansi && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-300 truncate mt-0.5" title={item.asalInstansi}>
+                          {item.asalInstansi}
+                        </p>
+                      )}
                     </td>
 
                     {/* Kategori & Detail */}
@@ -480,18 +493,23 @@ export default function AdminPengaduanPage() {
 
             <div className="text-xs space-y-1.5 text-slate-600 dark:text-slate-300 bg-amber-50 dark:bg-slate-800/80 p-3 rounded-2xl border border-amber-200 dark:border-slate-700">
               <p><strong className="text-slate-900 dark:text-white">Pelapor:</strong> {selectedItem.nama}</p>
-              <p className="flex items-center gap-1.5">
+              <p className="flex items-center gap-1.5 flex-wrap">
                 <strong className="text-slate-900 dark:text-white">Kontak:</strong>
-                {isEmailKontak(selectedItem.email) ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-semibold">
-                    <Mail className="w-3 h-3" /> {selectedItem.email}
-                  </span>
-                ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-semibold">
+                  <Mail className="w-3 h-3" /> {selectedItem.email}
+                </span>
+                {selectedItem.noHp && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-semibold">
-                    <Phone className="w-3 h-3" /> {selectedItem.email}
+                    <Phone className="w-3 h-3" /> {selectedItem.noHp}
                   </span>
                 )}
               </p>
+              {(selectedItem.asalInstansi || selectedItem.jenisKelamin) && (
+                <p>
+                  <strong className="text-slate-900 dark:text-white">Pelapor:</strong>{" "}
+                  {[selectedItem.jenisKelamin, selectedItem.asalInstansi].filter(Boolean).join(" - ")}
+                </p>
+              )}
               <p><strong className="text-slate-900 dark:text-white">Kategori:</strong> {selectedItem.kategori}</p>
               <p><strong className="text-slate-900 dark:text-white">Detail:</strong> {selectedItem.detail}</p>
             </div>

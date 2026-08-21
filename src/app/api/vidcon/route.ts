@@ -2,38 +2,29 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { vidconRequests } from "@/lib/db/schema";
+import { vidconSchema } from "@/lib/schemas/vidcon";
 import * as z from "zod";
-
-const vidconSchema = z.object({
-  nama: z.string().min(2, "Nama minimal 2 karakter"),
-  instansi: z.string().min(2, "Asal instansi minimal 2 karakter"),
-  alamat: z.string().min(3, "Alamat minimal 3 karakter"),
-  noHp: z.string().min(6, "Nomor HP/WA tidak valid"),
-  email: z.string().email("Format email tidak valid"),
-  topik: z.string().min(2, "Pilih cakupan/topik konsultasi"),
-  deskripsi: z.string().min(10, "Uraian deskripsi minimal 10 karakter"),
-  tanggal: z.string().min(8, "Pilih tanggal konsultasi"),
-  jam: z.string().min(4, "Pilih jam konsultasi"),
-});
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const validatedData = vidconSchema.parse(body);
+    const data = vidconSchema.parse(body);
 
     const [inserted] = await db
       .insert(vidconRequests)
       .values({
-        nama: validatedData.nama,
-        asalInstansi: validatedData.instansi,
-        alamat: validatedData.alamat,
-        noHp: validatedData.noHp,
-        email: validatedData.email,
-        cakupan: validatedData.topik,
-        deskripsi: validatedData.deskripsi,
-        tanggal: validatedData.tanggal,
-        jam: validatedData.jam,
+        nama: data.nama,
+        asalInstansi: data.instansi,
+        alamat: data.alamat,
+        noHp: data.noHp,
+        email: data.email,
+        cakupan: data.topik,
+        deskripsi: data.deskripsi,
+        tanggal: data.tanggal,
+        jam: data.jam,
         status: "PENDING",
+        layananInklusif: data.layananInklusif ?? null,
+        layananInklusifCatatan: data.layananInklusifCatatan || null,
       })
       .$returningId();
 

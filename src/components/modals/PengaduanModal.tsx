@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { toast } from "sonner";
+import { aduanSchema, type AduanFormData } from "@/lib/schemas/aduan";
 import { 
   X, 
   ShieldAlert, 
@@ -15,20 +15,12 @@ import {
   Lock, 
   ExternalLink,
   Building2,
+  Phone,
   AlertTriangle,
   FileCheck,
   CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const pengaduanSchema = z.object({
-  nama: z.string().min(2, "Nama harus diisi"),
-  kontak: z.string().min(5, "Kontak/Email harus diisi untuk konfirmasi"),
-  kategori: z.string().min(1, "Pilih kategori pengaduan"),
-  detail: z.string().min(15, "Uraian pengaduan minimal 15 karakter"),
-});
-
-type PengaduanFormData = z.infer<typeof pengaduanSchema>;
 
 interface PengaduanModalProps {
   isOpen: boolean;
@@ -43,11 +35,11 @@ export default function PengaduanModal({ isOpen, onClose }: PengaduanModalProps)
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<PengaduanFormData>({
-    resolver: zodResolver(pengaduanSchema),
+  } = useForm<AduanFormData>({
+    resolver: zodResolver(aduanSchema),
   });
 
-  const onSubmit = async (data: PengaduanFormData) => {
+  const onSubmit = async (data: AduanFormData) => {
     try {
       const res = await fetch("/api/pengaduan", {
         method: "POST",
@@ -172,19 +164,73 @@ export default function PengaduanModal({ isOpen, onClose }: PengaduanModalProps)
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-amber-600" /> Email / No. HP untuk Balasan *
-                </label>
-                <input
-                  {...register("kontak")}
-                  type="text"
-                  placeholder="nama@email.com atau 0812xxx"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
-                />
-                {errors.kontak && (
-                  <p className="text-xs text-rose-500 mt-1">{errors.kontak.message}</p>
-                )}
+              {/*
+                Email dan nomor HP DIPISAH. Sebelumnya keduanya satu isian
+                "kontak" yang disimpan ke kolom email - warga yang mengisi
+                nomor HP membuat nomornya tersimpan sebagai alamat email,
+                dan petugas membalas ke alamat yang tidak pernah ada.
+              */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-amber-600" /> Email untuk Balasan *
+                  </label>
+                  <input
+                    {...register("email")}
+                    type="email"
+                    placeholder="nama@email.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
+                  />
+                  {errors.email && (
+                    <p className="text-xs text-rose-500 mt-1">{errors.email.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-amber-600" /> No. HP / WhatsApp
+                  </label>
+                  <input
+                    {...register("noHp")}
+                    type="tel"
+                    placeholder="081234567890 (opsional)"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
+                  />
+                  {errors.noHp && (
+                    <p className="text-xs text-rose-500 mt-1">{errors.noHp.message}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Jenis Kelamin
+                  </label>
+                  <select
+                    {...register("jenisKelamin")}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
+                  >
+                    <option value="">Tidak ingin menyebutkan</option>
+                    <option value="Laki-laki">Laki-laki</option>
+                    <option value="Perempuan">Perempuan</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-amber-600" /> Asal Instansi
+                  </label>
+                  <input
+                    {...register("asalInstansi")}
+                    type="text"
+                    placeholder="Instansi / perusahaan (opsional)"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
+                  />
+                  {errors.asalInstansi && (
+                    <p className="text-xs text-rose-500 mt-1">{errors.asalInstansi.message}</p>
+                  )}
+                </div>
               </div>
 
               <div>

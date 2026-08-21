@@ -2,32 +2,29 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { pengaduans } from "@/lib/db/schema";
+import { aduanSchema } from "@/lib/schemas/aduan";
 import * as z from "zod";
-
-const pengaduanSchema = z.object({
-  nama: z.string().min(2, "Nama pelapor/anonim harus diisi"),
-  kontak: z.string().min(5, "Kontak/Email harus diisi untuk konfirmasi"),
-  kategori: z.string().min(1, "Pilih kategori pengaduan"),
-  detail: z.string().min(15, "Uraian pengaduan minimal 15 karakter"),
-});
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const validated = pengaduanSchema.parse(body);
+    const data = aduanSchema.parse(body);
 
     const [inserted] = await db
       .insert(pengaduans)
       .values({
-        nama: validated.nama,
-        email: validated.kontak,
-        kategori: validated.kategori,
-        detail: validated.detail,
+        nama: data.nama,
+        email: data.email,
+        noHp: data.noHp || null,
+        jenisKelamin: data.jenisKelamin || null,
+        asalInstansi: data.asalInstansi || null,
+        kategori: data.kategori,
+        detail: data.detail,
         status: "PENDING",
       })
       .$returningId();
 
-    const [newPengaduan] = await db
+    const [newAduan] = await db
       .select()
       .from(pengaduans)
       .where(eq(pengaduans.id, inserted.id))
@@ -36,8 +33,8 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         success: true,
-        message: "Pengaduan mandiri berhasil diterima oleh BPS Musi Rawas.",
-        data: newPengaduan,
+        message: "Aduan berhasil diterima oleh BPS Musi Rawas.",
+        data: newAduan,
       },
       { status: 201 }
     );
@@ -49,9 +46,9 @@ export async function POST(req: Request) {
       );
     }
 
-    console.error("API Pengaduan Error:", error);
+    console.error("API Aduan Error:", error);
     return NextResponse.json(
-      { success: false, message: "Gagal mengirim pengaduan. Silakan coba lagi." },
+      { success: false, message: "Gagal mengirim aduan. Silakan coba lagi." },
       { status: 500 }
     );
   }

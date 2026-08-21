@@ -2,24 +2,11 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { toast } from "sonner";
+import { vidconSchema, type VidconFormData } from "@/lib/schemas/vidcon";
+import { LAYANAN_INKLUSIF, LAYANAN_INKLUSIF_INFO } from "@/lib/schemas/inklusi";
 import { X, Calendar, Clock, Video, User, Building, Mail, Phone, FileText, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const vidconSchema = z.object({
-  nama: z.string().min(2, "Nama minimal 2 karakter"),
-  instansi: z.string().min(2, "Asal instansi minimal 2 karakter"),
-  alamat: z.string().min(3, "Alamat minimal 3 karakter"),
-  noHp: z.string().min(6, "Nomor HP/WA tidak valid"),
-  email: z.string().email("Format email tidak valid"),
-  topik: z.string().min(2, "Pilih cakupan/topik konsultasi"),
-  deskripsi: z.string().min(10, "Uraian deskripsi minimal 10 karakter"),
-  tanggal: z.string().min(8, "Pilih tanggal konsultasi"),
-  jam: z.string().min(4, "Pilih jam konsultasi"),
-});
-
-type VidconFormData = z.infer<typeof vidconSchema>;
 
 interface VidconModalProps {
   isOpen: boolean;
@@ -223,15 +210,33 @@ export default function VidconModal({ isOpen, onClose }: VidconModalProps) {
                 <span className="px-2 py-0.5 rounded-full bg-indigo-200 text-indigo-800 text-[10px] font-extrabold">INKLUSI</span>
                 Bantuan Aksesibilitas Khusus (Disabilitas / Lansia)
               </label>
+              {/*
+                register() TANPA cast `as any`. Cast itulah yang dulu
+                membungkam TypeScript dan menyembunyikan bahwa field ini
+                tidak terdaftar di skema, sehingga isian warga dibuang
+                diam-diam oleh zodResolver sebelum sampai ke server.
+              */}
               <select
-                {...register("layananInklusif" as any)}
+                {...register("layananInklusif")}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-indigo-200 bg-white text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs font-medium"
               >
-                <option value="NONE">Tidak Ada (Layanan Umum Standard)</option>
-                <option value="TUNA_RUNGU">Tuna Rungu (Membutuhkan Juru Bahasa Isyarat / Teks Live Chat)</option>
-                <option value="LANSIA">Lansia / Lanjut Usia (Pendampingan Bicara Perlahan & Jelas)</option>
-                <option value="DISABILITAS_LAIN">Disabilitas Lainnya (Prioritas Pendampingan Khusus)</option>
+                {LAYANAN_INKLUSIF.map((nilai) => (
+                  <option key={nilai} value={nilai}>
+                    {LAYANAN_INKLUSIF_INFO[nilai].label}
+                  </option>
+                ))}
               </select>
+
+              <input
+                {...register("layananInklusifCatatan")}
+                type="text"
+                placeholder="Bila memilih 'Kebutuhan lain', jelaskan di sini (opsional)"
+                className="w-full px-3.5 py-2 rounded-xl border border-indigo-200 bg-white text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs"
+              />
+              {errors.layananInklusifCatatan && (
+                <p className="text-xs text-rose-500">{errors.layananInklusifCatatan.message}</p>
+              )}
+
               <p className="text-[10px] text-indigo-700">
                 *Petugas PST BPS Musi Rawas akan langsung menyiapkan fasilitas aksesibilitas prioritas sesuai kebutuhan Anda.
               </p>

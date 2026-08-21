@@ -19,16 +19,20 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+import type { ContactMessage } from "@/lib/db/schema";
+
+/** Route /api/admin/contact menambahkan isRead turunan dari kolom status. */
+type KontakItem = ContactMessage & { isRead: boolean };
 
 type SortField = "nama" | "subjek" | "createdAt" | "isRead";
 type SortOrder = "asc" | "desc";
 
 export default function AdminContactPage() {
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<KontakItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [readFilter, setReadFilter] = useState("ALL");
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState<KontakItem | null>(null);
   const [replyText, setReplyText] = useState("");
 
   // Sorting State
@@ -87,18 +91,16 @@ export default function AdminContactPage() {
 
   // Sorted Items
   const sortedItems = useMemo(() => {
+    // Nilai pembanding dinormalkan lebih dulu supaya tanggal dibandingkan
+    // sebagai angka dan teks dibandingkan tanpa peka huruf besar-kecil.
+    const kunci = (item: KontakItem): number | string =>
+      sortField === "createdAt"
+        ? new Date(item.createdAt).getTime()
+        : String(item[sortField] ?? "").toLowerCase();
+
     return [...items].sort((a, b) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
-
-      if (sortField === "createdAt") {
-        aVal = new Date(a.createdAt).getTime();
-        bVal = new Date(b.createdAt).getTime();
-      } else if (typeof aVal === "string") {
-        aVal = aVal.toLowerCase();
-        bVal = (bVal || "").toLowerCase();
-      }
-
+      const aVal = kunci(a);
+      const bVal = kunci(b);
       if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
       if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
       return 0;
@@ -296,12 +298,6 @@ export default function AdminContactPage() {
                         <Mail className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
                         <span className="truncate">{item.email}</span>
                       </p>
-                      {item.noHp && (
-                        <p className="text-[11px] text-slate-500 dark:text-slate-300 truncate flex items-center gap-1 mt-0.5" title={item.noHp}>
-                          <Phone className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
-                          <span className="truncate">{item.noHp}</span>
-                        </p>
-                      )}
                     </td>
 
                     {/* Subjek & Isu Pesan */}

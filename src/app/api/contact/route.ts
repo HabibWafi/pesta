@@ -2,27 +2,21 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { contacts } from "@/lib/db/schema";
+import { contactSchema } from "@/lib/schemas/contact";
 import * as z from "zod";
-
-const contactSchema = z.object({
-  nama: z.string().min(2, "Nama minimal 2 karakter"),
-  email: z.string().email("Email tidak valid"),
-  subjek: z.string().min(3, "Subjek minimal 3 karakter"),
-  pesan: z.string().min(10, "Pesan minimal 10 karakter"),
-});
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const validated = contactSchema.parse(body);
+    const data = contactSchema.parse(body);
 
     const [inserted] = await db
       .insert(contacts)
       .values({
-        nama: validated.nama,
-        email: validated.email,
-        subjek: validated.subjek,
-        pesan: validated.pesan,
+        nama: data.nama,
+        email: data.email,
+        subjek: data.subjek,
+        pesan: data.pesan,
         status: "UNREAD",
       })
       .$returningId();

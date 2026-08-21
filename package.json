@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:backup": "powershell -NoProfile -ExecutionPolicy Bypass -File db/backup.ps1",
     "db:generate": "node --env-file=.env node_modules/drizzle-kit/bin.cjs generate",
-    "db:studio": "node --env-file=.env node_modules/drizzle-kit/bin.cjs studio"
+    "db:studio": "node --env-file=.env node_modules/drizzle-kit/bin.cjs studio",
+    "db:sql": "node db/sql.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",
