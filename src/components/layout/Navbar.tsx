@@ -7,7 +7,6 @@ import {
   Menu, 
   X 
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -100,14 +99,20 @@ export default function Navbar() {
       </div>
 
       {/* Mobile Menu Drawer */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white/95 backdrop-blur-xl border-b border-slate-200 px-4 pt-4 pb-6 mt-3 shadow-xl"
-          >
+      {/*
+        Menu ponsel dibuka-tutup dengan grid, bukan pustaka animasi.
+        Navbar ada di setiap halaman, jadi apa pun yang diimpornya ikut
+        terkirim ke semua pengunjung - termasuk yang tidak pernah membuka
+        menu ini.
+      */}
+      <div
+        className={`md:hidden grid transition-all duration-300 ease-out ${
+          mobileMenuOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+        }`}
+        aria-hidden={!mobileMenuOpen}
+      >
+        <div className="overflow-hidden">
+          <div className="bg-white/95 backdrop-blur-xl border-b border-slate-200 px-4 pt-4 pb-6 mt-3 shadow-xl">
             <div className="flex flex-col gap-2">
               {navLinks.map((link) => (
                 <a
@@ -120,9 +125,9 @@ export default function Navbar() {
                 </a>
               ))}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      </div>
     </header>
   );
 }

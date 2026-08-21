@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { 
   Accessibility, 
   Ear, 
@@ -38,9 +37,8 @@ export default function InclusivitySection() {
         {/* 4 Key Innovations Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Innovation 1: Tuna Rungu */}
-          <motion.div
-            whileHover={{ y: -5 }}
-            className="p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col justify-between space-y-4"
+          <div
+            className="p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col justify-between space-y-4 hover:-translate-y-[5px] transition-transform duration-200"
           >
             <div className="space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
@@ -55,12 +53,11 @@ export default function InclusivitySection() {
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               <span>Opsi JBI di Formulir ViDCon</span>
             </div>
-          </motion.div>
+          </div>
 
           {/* Innovation 2: Lansia */}
-          <motion.div
-            whileHover={{ y: -5 }}
-            className="p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col justify-between space-y-4"
+          <div
+            className="p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col justify-between space-y-4 hover:-translate-y-[5px] transition-transform duration-200"
           >
             <div className="space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
@@ -75,12 +72,11 @@ export default function InclusivitySection() {
               <CheckCircle2 className="w-4 h-4 text-amber-400" />
               <span>Pembesar Teks &amp; Font Jelas</span>
             </div>
-          </motion.div>
+          </div>
 
           {/* Innovation 3: Audio Voice Reader */}
-          <motion.div
-            whileHover={{ y: -5 }}
-            className="p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col justify-between space-y-4"
+          <div
+            className="p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col justify-between space-y-4 hover:-translate-y-[5px] transition-transform duration-200"
           >
             <div className="space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
@@ -95,12 +91,11 @@ export default function InclusivitySection() {
               <CheckCircle2 className="w-4 h-4 text-indigo-400" />
               <span>Dengarkan via Tombol Melayang</span>
             </div>
-          </motion.div>
+          </div>
 
           {/* Innovation 4: High Contrast */}
-          <motion.div
-            whileHover={{ y: -5 }}
-            className="p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col justify-between space-y-4"
+          <div
+            className="p-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col justify-between space-y-4 hover:-translate-y-[5px] transition-transform duration-200"
           >
             <div className="space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
@@ -115,7 +110,7 @@ export default function InclusivitySection() {
               <CheckCircle2 className="w-4 h-4 text-cyan-400" />
               <span>Standar Aksesibilitas WCAG</span>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Guarantee Banner */}

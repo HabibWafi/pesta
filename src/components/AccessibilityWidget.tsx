@@ -16,7 +16,6 @@ import {
   Ear,
   ShieldCheck
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 export default function AccessibilityWidget() {
@@ -98,11 +97,9 @@ export default function AccessibilityWidget() {
     <>
       {/* Floating Accessibility Trigger Button */}
       <div className="fixed bottom-6 left-6 z-40">
-        <motion.button
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.95 }}
+        <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`p-3.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all ${
+          className={`p-3.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-transform duration-150 hover:scale-[1.08] active:scale-95 ${
             highContrast
               ? "bg-yellow-400 text-black border-2 border-black ring-4 ring-yellow-400/50"
               : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/40 ring-4 ring-indigo-500/20"
@@ -112,28 +109,21 @@ export default function AccessibilityWidget() {
         >
           <Accessibility className="w-6 h-6 animate-pulse" />
           <span className="hidden sm:inline font-extrabold pr-1">Layanan Inklusif</span>
-        </motion.button>
+        </button>
       </div>
 
       {/* Accessibility Control Modal / Panel */}
-      <AnimatePresence>
-        {isOpen && (
+      {isOpen && (
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-start p-4 sm:p-6 pointer-events-none">
             {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm pointer-events-auto"
+              className="latar-masuk fixed inset-0 bg-slate-900/40 backdrop-blur-sm pointer-events-auto"
             />
 
             {/* Panel Card */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 pointer-events-auto overflow-hidden z-10"
+            <div
+              className="panel-masuk relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 pointer-events-auto overflow-hidden z-10"
             >
               {/* Header */}
               <div className="bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 p-5 text-white flex items-center justify-between">
@@ -311,10 +301,9 @@ export default function AccessibilityWidget() {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
     </>
   );
 }

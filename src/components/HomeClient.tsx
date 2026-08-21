@@ -1,22 +1,47 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import Navbar from "@/components/layout/Navbar";
 import HeroSection from "@/components/sections/HeroSection";
 import ServicesSection from "@/components/sections/ServicesSection";
-import SpecialServicesSection from "@/components/sections/SpecialServicesSection";
-import InclusivitySection from "@/components/sections/InclusivitySection";
-import VidconSection from "@/components/sections/VidconSection";
-import DocumentationSection from "@/components/sections/DocumentationSection";
-import ZeroRupiahSection from "@/components/sections/ZeroRupiahSection";
-import FaqSection from "@/components/sections/FaqSection";
-import ContactSection from "@/components/sections/ContactSection";
 import Footer from "@/components/layout/Footer";
-import VidconModal from "@/components/modals/VidconModal";
-import PengaduanModal from "@/components/modals/PengaduanModal";
-import AccessibilityWidget from "@/components/AccessibilityWidget";
 import type { Faq, Testimonial } from "@/lib/db/schema";
 import type { Pengaturan } from "@/lib/content";
+
+/**
+ * Bagian yang dimuat belakangan.
+ *
+ * Dua kelompok, dengan alasan yang berbeda:
+ *
+ * 1. SECTION DI BAWAH LAYAR - tetap dirender di server (`ssr` dibiarkan
+ *    menyala). Isinya wajib ada di HTML sumber untuk mesin pencari dan
+ *    pembaca layar; yang ditunda hanya JavaScript-nya, sehingga hidrasi
+ *    tidak lagi menahan halaman sejak detik pertama.
+ *
+ * 2. MODAL DAN WIDGET - `ssr: false`. Keduanya bukan konten: modal baru ada
+ *    setelah tombol ditekan, widget aksesibilitas mengambang di atas
+ *    halaman. Merendernya di server tidak memberi apa pun.
+ *
+ * Yang membuat ini berdampak besar: kedua modal memakai react-hook-form dan
+ * skema Zod. Sebelumnya keduanya ikut terkirim di muatan pertama halaman
+ * depan - sekitar 220 KB JavaScript untuk formulir yang mungkin tidak pernah
+ * dibuka pengunjung.
+ */
+
+const InclusivitySection = dynamic(() => import("@/components/sections/InclusivitySection"));
+const SpecialServicesSection = dynamic(() => import("@/components/sections/SpecialServicesSection"));
+const VidconSection = dynamic(() => import("@/components/sections/VidconSection"));
+const DocumentationSection = dynamic(() => import("@/components/sections/DocumentationSection"));
+const ZeroRupiahSection = dynamic(() => import("@/components/sections/ZeroRupiahSection"));
+const FaqSection = dynamic(() => import("@/components/sections/FaqSection"));
+const ContactSection = dynamic(() => import("@/components/sections/ContactSection"));
+
+const VidconModal = dynamic(() => import("@/components/modals/VidconModal"), { ssr: false });
+const PengaduanModal = dynamic(() => import("@/components/modals/PengaduanModal"), { ssr: false });
+const AccessibilityWidget = dynamic(() => import("@/components/AccessibilityWidget"), {
+  ssr: false,
+});
 
 export interface KontenLanding {
   pengaturan: Pengaturan;
@@ -75,15 +100,24 @@ export default function HomeClient({ konten }: { konten: KontenLanding }) {
       <AccessibilityWidget />
       <Footer />
 
-      <VidconModal isOpen={vidconOpen} onClose={() => setVidconOpen(false)} />
-      <PengaduanModal
-        isOpen={pengaduanOpen}
-        onClose={() => setPengaduanOpen(false)}
-        istilah={{
-          tab: pengaturan["istilah.aduan_tab"],
-          sukses: pengaturan["istilah.aduan_sukses"],
-        }}
-      />
+      {/*
+        Dipasang hanya saat terbuka, bukan sekadar disembunyikan.
+        Keduanya memang sudah `return null` saat tertutup, tapi dengan
+        dirender tanpa syarat, Next tetap mengambil berkas JavaScript-nya
+        begitu halaman selesai dimuat. Syarat di sini yang menahannya sampai
+        tombolnya benar-benar ditekan.
+      */}
+      {vidconOpen && <VidconModal isOpen onClose={() => setVidconOpen(false)} />}
+      {pengaduanOpen && (
+        <PengaduanModal
+          isOpen
+          onClose={() => setPengaduanOpen(false)}
+          istilah={{
+            tab: pengaturan["istilah.aduan_tab"],
+            sukses: pengaturan["istilah.aduan_sukses"],
+          }}
+        />
+      )}
     </div>
   );
 }

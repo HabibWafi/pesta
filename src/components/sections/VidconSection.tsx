@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import Muncul from "@/components/ui/Muncul";
 import { 
   Video, 
   Users, 
@@ -82,15 +82,13 @@ export default function VidconSection({ onOpenVidcon }: VidconSectionProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
+          <Muncul
+            arah="skala"
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-bold mb-4 shadow-inner"
           >
             <Video className="w-4 h-4 text-cyan-400" />
             Layanan Virtual Consultation Resmi
-          </motion.div>
+          </Muncul>
           <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white">
             ViDCon (Virtual Data Consultation)
           </h2>
@@ -115,14 +113,10 @@ export default function VidconSection({ onOpenVidcon }: VidconSectionProps) {
             {steps.map((item, index) => {
               const Icon = item.icon;
               return (
-                <motion.div
+                <Muncul
                   key={index}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: index * 0.15 }}
-                  whileHover={{ y: -8, scale: 1.02 }}
-                  className="bg-slate-800/80 border border-slate-700/80 rounded-3xl p-6 relative overflow-hidden backdrop-blur-md shadow-xl flex flex-col justify-between group hover:border-cyan-500/50 hover:shadow-cyan-500/10 transition-all duration-300"
+                  delay={index * 0.15}
+                  className="bg-slate-800/80 border border-slate-700/80 rounded-3xl p-6 relative overflow-hidden backdrop-blur-md shadow-xl flex flex-col justify-between group hover:border-cyan-500/50 hover:shadow-cyan-500/10 hover:-translate-y-[8px] transition-all duration-300"
                 >
                   {/* Decorative Corner Glow */}
                   <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-bl-full pointer-events-none" />
@@ -150,16 +144,15 @@ export default function VidconSection({ onOpenVidcon }: VidconSectionProps) {
                   {/* Animated Arrow Connecting Step Indicator for Desktop */}
                   {index < steps.length - 1 && (
                     <div className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-20 items-center justify-center">
-                      <motion.div 
-                        animate={{ x: [0, 4, 0] }}
-                        transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-                        className="w-7 h-7 rounded-full bg-slate-800 border border-cyan-500/50 text-cyan-400 flex items-center justify-center shadow-lg backdrop-blur-md"
+                      <div
+                        aria-hidden
+                        className="panah-dorong w-7 h-7 rounded-full bg-slate-800 border border-cyan-500/50 text-cyan-400 flex items-center justify-center shadow-lg backdrop-blur-md"
                       >
                         <ChevronRight className="w-4 h-4" />
-                      </motion.div>
+                      </div>
                     </div>
                   )}
-                </motion.div>
+                </Muncul>
               );
             })}
           </div>
@@ -168,11 +161,8 @@ export default function VidconSection({ onOpenVidcon }: VidconSectionProps) {
         {/* Grid 2 Columns: Target Audience & Covered Topics */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
           {/* Target Audience */}
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+          <Muncul
+            arah="kiri"
             className="bg-slate-800/60 rounded-3xl p-8 border border-slate-700/60 backdrop-blur-md space-y-6"
           >
             <div className="flex items-center gap-3">
@@ -189,10 +179,9 @@ export default function VidconSection({ onOpenVidcon }: VidconSectionProps) {
               {targetAudience.map((target, idx) => {
                 const TargetIcon = target.icon;
                 return (
-                  <motion.div 
-                    key={idx} 
-                    whileHover={{ scale: 1.02 }}
-                    className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1.5 hover:border-indigo-500/40 transition-all"
+                  <div
+                    key={idx}
+                    className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1.5 hover:border-indigo-500/40 hover:scale-[1.02] transition-all"
                   >
                     <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold">
                       <TargetIcon className="w-4 h-4 shrink-0" />
@@ -201,18 +190,15 @@ export default function VidconSection({ onOpenVidcon }: VidconSectionProps) {
                     <p className="text-[11px] text-slate-400 leading-relaxed">
                       {target.desc}
                     </p>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
-          </motion.div>
+          </Muncul>
 
           {/* Topics Covered */}
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
+          <Muncul
+            arah="kanan"
             className="bg-slate-800/60 rounded-3xl p-8 border border-slate-700/60 backdrop-blur-md space-y-6"
           >
             <div className="flex items-center gap-3">
@@ -227,25 +213,20 @@ export default function VidconSection({ onOpenVidcon }: VidconSectionProps) {
 
             <div className="space-y-3">
               {topics.map((topic, idx) => (
-                <motion.div 
+                <div
                   key={idx}
-                  whileHover={{ x: 4 }}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-200 hover:border-cyan-500/40 transition-all"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-200 hover:border-cyan-500/40 hover:translate-x-1 transition-all"
                 >
                   <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
                   <span>{topic}</span>
-                </motion.div>
+                </div>
               ))}
             </div>
-          </motion.div>
+          </Muncul>
         </div>
 
         {/* Bottom Call to Action Card */}
-        <motion.div 
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
+        <Muncul
           className="mt-16 text-center bg-gradient-to-r from-indigo-900 via-slate-800 to-cyan-950 p-8 sm:p-10 rounded-3xl border border-indigo-500/30 shadow-2xl relative overflow-hidden"
         >
           <div className="max-w-2xl mx-auto space-y-4">
@@ -266,7 +247,7 @@ export default function VidconSection({ onOpenVidcon }: VidconSectionProps) {
               </button>
             </div>
           </div>
-        </motion.div>
+        </Muncul>
       </div>
     </section>
   );

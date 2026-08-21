@@ -244,3 +244,87 @@ html.accessible-font-mode * {
   letter-spacing: 0.04em !important;
 }
 
+
+/*
+ * Hormati pengaturan "kurangi gerak" di sistem operasi.
+ *
+ * Bagi sebagian orang - terutama yang punya gangguan vestibular - gerak
+ * pada halaman menimbulkan pusing yang nyata, bukan sekadar gangguan
+ * selera. Aturan ini mematikan seluruh transisi dan animasi ketika
+ * pengunjung sudah menyatakannya lewat pengaturan sistem.
+ *
+ * Nilainya tidak nol supaya peristiwa transitionend tetap terkirim; kode
+ * yang menunggu peristiwa itu tidak ikut macet.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Denyut lembut untuk gumpalan cahaya di latar Hero.
+ *
+ * Sebelumnya dijalankan framer-motion lewat JavaScript, dengan
+ * `repeat: Infinity` - artinya ada kerja di main thread selama halaman
+ * terbuka. Sebagai animasi CSS, seluruhnya ditangani compositor peramban
+ * dan tidak menyentuh main thread sama sekali.
+ */
+@keyframes denyut-cahaya {
+  0%, 100% { transform: translateX(-50%) scale(1);   opacity: 0.35; }
+  50%      { transform: translateX(-50%) scale(1.1); opacity: 0.5; }
+}
+
+@keyframes apung-cahaya {
+  0%, 100% { transform: translateY(0);     opacity: 0.25; }
+  50%      { transform: translateY(-15px); opacity: 0.4; }
+}
+
+.cahaya-denyut { animation: denyut-cahaya 8s ease-in-out infinite; }
+.cahaya-apung  { animation: apung-cahaya 6s ease-in-out infinite; }
+
+/* Panah penghubung langkah ViDCon - dorongan kecil berulang ke kanan. */
+@keyframes dorong-kanan {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(4px); }
+}
+.panah-dorong { animation: dorong-kanan 1.5s ease-in-out infinite; }
+
+/*
+ * Animasi masuk untuk elemen yang tampil begitu halaman dibuka.
+ *
+ * Dipakai komponen Muncul dengan pemicu "segera". Titik awalnya dibaca dari
+ * properti khusus --muncul-awal, sehingga satu keyframe melayani seluruh
+ * arah (naik, turun, kiri, kanan, skala) tanpa perlu lima keyframe terpisah.
+ *
+ * `both` pada shorthand animation yang menahan elemen di keadaan awal
+ * selama masa jeda - tanpa itu elemen berkedip tampil dulu sebelum
+ * animasinya mulai.
+ */
+@keyframes muncul {
+  from {
+    opacity: 0;
+    transform: var(--muncul-awal, translateY(20px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Panel aksesibilitas - muncul memudar dan sedikit membesar. */
+@keyframes panel-masuk {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes latar-masuk {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.panel-masuk { animation: panel-masuk 0.25s ease-out both; }
+.latar-masuk { animation: latar-masuk 0.2s ease-out both; }

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { 
   Bot, 
   FileSpreadsheet, 
@@ -99,11 +98,9 @@ export default function ServicesSection({ onOpenVidcon, onOpenPengaduan }: Servi
           {cards.map((card, idx) => {
             const Icon = card.icon;
             return (
-              <motion.div
+              <div
                 key={idx}
-                whileHover={{ y: -6 }}
-                transition={{ duration: 0.2 }}
-                className="rounded-3xl p-7 bg-white border border-slate-200/90 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:border-indigo-300 transition-all flex flex-col justify-between relative overflow-hidden group"
+                className="rounded-3xl p-7 bg-white border border-slate-200/90 shadow-lg shadow-slate-200/50 hover:shadow-xl hover:border-indigo-300 transition-all duration-200 flex flex-col justify-between relative overflow-hidden group hover:-translate-y-[6px]"
               >
                 <div>
                   {/* Top Badge & Icon */}
@@ -167,7 +164,7 @@ export default function ServicesSection({ onOpenVidcon, onOpenPengaduan }: Servi
                     </button>
                   )}
                 </div>
-              </motion.div>
+              </div>
             );
           })}
         </div>

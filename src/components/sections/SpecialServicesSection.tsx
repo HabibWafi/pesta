@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { 
   Award, 
   FileCheck2, 
@@ -37,9 +36,8 @@ export default function SpecialServicesSection() {
         {/* Grid 2x2 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Card 1: ROMANTIK (Rekomendasi Statistik) */}
-          <motion.div
-            whileHover={{ y: -4 }}
-            className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between"
+          <div
+            className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between hover:-translate-y-[4px] transition-transform duration-200"
           >
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -79,12 +77,11 @@ export default function SpecialServicesSection() {
               <span>Akses Portal ROMANTIK BPS</span>
               <ExternalLink className="w-4 h-4" />
             </a>
-          </motion.div>
+          </div>
 
           {/* Card 2: SKD (Survei Kebutuhan Data) */}
-          <motion.div
-            whileHover={{ y: -4 }}
-            className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between"
+          <div
+            className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between hover:-translate-y-[4px] transition-transform duration-200"
           >
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -124,12 +121,11 @@ export default function SpecialServicesSection() {
               <span>Isi Kuesioner SKD 2025</span>
               <ExternalLink className="w-4 h-4" />
             </a>
-          </motion.div>
+          </div>
 
           {/* Card 3: Desa Cantik */}
-          <motion.div
-            whileHover={{ y: -4 }}
-            className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between"
+          <div
+            className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between hover:-translate-y-[4px] transition-transform duration-200"
           >
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -169,12 +165,11 @@ export default function SpecialServicesSection() {
               <span>Kunjungi Portal Desa Cantik Musi Rawas</span>
               <ExternalLink className="w-4 h-4" />
             </a>
-          </motion.div>
+          </div>
 
           {/* Card 4: Silastik & Data Wilkerstat */}
-          <motion.div
-            whileHover={{ y: -4 }}
-            className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between"
+          <div
+            className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between hover:-translate-y-[4px] transition-transform duration-200"
           >
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -214,7 +209,7 @@ export default function SpecialServicesSection() {
               <span>Akses Portal SILASTIK BPS</span>
               <ExternalLink className="w-4 h-4" />
             </a>
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>

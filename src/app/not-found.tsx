@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import Muncul from "@/components/ui/Muncul";
 import { Home, ArrowLeft, FileQuestion, Sparkles, MessageCircleQuestion } from "lucide-react";
 
 export default function NotFound() {
@@ -14,10 +14,10 @@ export default function NotFound() {
 
       <div className="max-w-xl w-full text-center space-y-8 relative z-10">
         {/* Brand Header */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
+        <Muncul
+          pemicu="segera"
+          arah="skala"
+          duration={0.5}
           className="inline-flex items-center gap-3 bg-slate-800/80 p-2.5 px-5 rounded-full border border-slate-700 backdrop-blur-md shadow-xl"
         >
           <div className="w-8 h-8 rounded-xl bg-white p-0.5 shadow-md flex items-center justify-center">
@@ -32,13 +32,12 @@ export default function NotFound() {
           <span className="font-extrabold text-sm tracking-tight text-white">
             PESTA BPS Musi Rawas
           </span>
-        </motion.div>
+        </Muncul>
 
         {/* 404 Badge & Heading */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
+        <Muncul
+          pemicu="segera"
+          delay={0.1}
           className="space-y-4"
         >
           <div className="relative inline-block">
@@ -57,13 +56,12 @@ export default function NotFound() {
           <p className="text-slate-400 text-sm max-w-md mx-auto leading-relaxed">
             Maaf, alamat tautan yang Anda tuju tidak dapat ditemukan atau mungkin telah dipindahkan ke layanan statistik baru.
           </p>
-        </motion.div>
+        </Muncul>
 
         {/* Navigation Action Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+        <Muncul
+          pemicu="segera"
+          delay={0.2}
           className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2"
         >
           <Link
@@ -81,18 +79,19 @@ export default function NotFound() {
             <MessageCircleQuestion className="w-4 h-4 text-cyan-400" />
             <span>Pusat Bantuan PST</span>
           </Link>
-        </motion.div>
+        </Muncul>
 
         {/* Footer Note */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
+        <Muncul
+          pemicu="segera"
+          arah="diam"
+          duration={0.5}
+          delay={0.3}
           className="pt-8 text-xs text-slate-500 flex items-center justify-center gap-1.5"
         >
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
           <span>BPS Kabupaten Musi Rawas &bull; Pelayanan Statistik Digital</span>
-        </motion.div>
+        </Muncul>
       </div>
     </div>
   );

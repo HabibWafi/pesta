@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { Star, Quote, UserCheck } from "lucide-react";
 import type { Testimonial } from "@/lib/db/schema";
 
@@ -29,10 +28,9 @@ export default function DocumentationSection({ testimoni }: DocumentationSection
         {/* Testimonials Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {testimoni.map((item, index) => (
-            <motion.div
+            <div
               key={index}
-              whileHover={{ y: -4 }}
-              className="p-8 rounded-3xl bg-slate-50 border border-slate-200/80 shadow-sm flex flex-col justify-between relative overflow-hidden"
+              className="p-8 rounded-3xl bg-slate-50 border border-slate-200/80 shadow-sm flex flex-col justify-between relative overflow-hidden hover:-translate-y-[4px] transition-transform duration-200"
             >
               <Quote className="absolute top-6 right-6 w-10 h-10 text-slate-200 pointer-events-none" />
 
@@ -60,7 +58,7 @@ export default function DocumentationSection({ testimoni }: DocumentationSection
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>

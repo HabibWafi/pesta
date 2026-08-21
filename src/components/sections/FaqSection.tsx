@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { ChevronDown, HelpCircle } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import type { Faq } from "@/lib/db/schema";
 
 interface FaqSectionProps {
@@ -61,20 +60,27 @@ export default function FaqSection({ faq }: FaqSectionProps) {
                   </div>
                 </button>
 
-                <AnimatePresence>
-                  {isOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className="px-6 pb-6 text-slate-600 text-sm leading-relaxed border-t border-slate-100 pt-4">
-                        {item.jawaban}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {/*
+                  Buka-tutup dengan grid, bukan JavaScript.
+                  Tinggi "auto" tidak bisa dianimasikan langsung oleh CSS,
+                  tetapi `grid-template-rows` dari 0fr ke 1fr bisa - dan
+                  hasilnya identik tanpa memuat pustaka animasi apa pun.
+                  Jawabannya tetap ada di HTML sumber sehingga terbaca mesin
+                  pencari, dan `aria-hidden` menahannya dari pembaca layar
+                  selama masih tertutup.
+                */}
+                <div
+                  className={`grid transition-all duration-300 ease-out ${
+                    isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                  }`}
+                  aria-hidden={!isOpen}
+                >
+                  <div className="overflow-hidden">
+                    <div className="px-6 pb-6 text-slate-600 text-sm leading-relaxed border-t border-slate-100 pt-4">
+                      {item.jawaban}
+                    </div>
+                  </div>
+                </div>
               </div>
             );
           })}

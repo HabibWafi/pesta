@@ -8,7 +8,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-plus-jakarta",
   display: "swap",
-  weight: ["300", "400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -24,11 +24,6 @@ export const metadata: Metadata = {
     "Musi Rawas Data",
   ],
   authors: [{ name: "BPS Kabupaten Musi Rawas" }],
-  icons: {
-    icon: "/images/pesta_logo.png",
-    shortcut: "/images/pesta_logo.png",
-    apple: "/images/pesta_logo.png",
-  },
   openGraph: {
     title: "PESTA - Pelayanan Statistik Digital BPS Musi Rawas",
     description:
@@ -44,6 +39,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" className={`${plusJakartaSans.variable} scroll-smooth`}>
+      <head>
+        {/*
+          Jaring pengaman bagi pengunjung tanpa JavaScript.
+
+          Elemen beranimasi masuk dirender dengan opacity 0 dan baru
+          ditampilkan oleh skrip. Kalau skripnya tidak pernah jalan, seluruh
+          isi halaman tak terlihat - bukan sekadar tanpa animasi, melainkan
+          kosong. Aturan ini memaksanya tampil.
+        */}
+        <noscript>
+          <style>{`[data-muncul]{opacity:1!important;transform:none!important;animation:none!important}`}</style>
+        </noscript>
+      </head>
       <body className={`${plusJakartaSans.className} min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-indigo-500 selection:text-white flex flex-col`}>
         {children}
         <Toaster position="top-right" richColors closeButton />

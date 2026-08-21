@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import Muncul from "@/components/ui/Muncul";
 import { 
   Video, 
   ShieldAlert, 
@@ -72,74 +72,57 @@ export default function HeroSection({ onOpenVidcon, onOpenPengaduan }: HeroSecti
   return (
     <section id="hero" className="relative pt-32 pb-20 md:pt-40 md:pb-24 overflow-hidden bg-slate-50">
       {/* Dynamic Animated Background Glow Blobs */}
-      <motion.div
-        animate={{
-          scale: [1, 1.1, 1],
-          opacity: [0.35, 0.5, 0.35],
-        }}
-        transition={{
-          duration: 8,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-        className="glow-blob top-10 left-1/2 -translate-x-1/2 w-[650px] h-[380px] bg-gradient-to-tr from-indigo-300 via-sky-300 to-emerald-200 pointer-events-none"
+      <div
+        aria-hidden
+        className="cahaya-denyut glow-blob top-10 left-1/2 w-[650px] h-[380px] bg-gradient-to-tr from-indigo-300 via-sky-300 to-emerald-200 pointer-events-none"
       />
-      <motion.div
-        animate={{
-          y: [0, -15, 0],
-          opacity: [0.25, 0.4, 0.25],
-        }}
-        transition={{
-          duration: 6,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-        className="glow-blob top-40 right-10 w-[350px] h-[350px] bg-cyan-400 pointer-events-none"
+      <div
+        aria-hidden
+        className="cahaya-apung glow-blob top-40 right-10 w-[350px] h-[350px] bg-cyan-400 pointer-events-none"
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center max-w-3xl mx-auto space-y-6">
           {/* Top Pill Badge */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+          <Muncul
+            pemicu="segera"
+            arah="turun"
+            duration={0.5}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/90 border border-indigo-100 shadow-sm backdrop-blur-md text-xs font-semibold text-indigo-700"
           >
             <Sparkles className="w-4 h-4 text-amber-500 animate-spin" style={{ animationDuration: '4s' }} />
             <span>Inovasi Pelayanan Publik Digital BPS Musi Rawas</span>
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
             <span className="text-slate-500 font-normal">Versi 2.0</span>
-          </motion.div>
+          </Muncul>
 
           {/* Main Title with Animated Gradient Accent */}
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
+          <Muncul
+            as="h1"
+            pemicu="segera"
+            delay={0.1}
             className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 leading-[1.15]"
           >
             Konsultasi Data Statistik{" "}
             <span className="gradient-text-bps block sm:inline">
               Mudah, Cepat & Canggih
             </span>
-          </motion.h1>
+          </Muncul>
 
           {/* Description */}
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+          <Muncul
+            as="p"
+            pemicu="segera"
+            delay={0.2}
             className="text-base sm:text-lg text-slate-600 leading-relaxed font-medium max-w-2xl mx-auto"
           >
             Satu portal untuk layanan **Virtual Data Consultation (ViDCon)**, permohonan data statistik resmi, serta sarana pengaduan publik yang bebas biaya (Nol Rupiah).
-          </motion.p>
+          </Muncul>
 
           {/* 3 Harmonious Action Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
+          <Muncul
+            pemicu="segera"
+            delay={0.3}
             className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-4 max-w-2xl mx-auto"
           >
             {/* Button 1: ViDCon Online */}
@@ -185,13 +168,12 @@ export default function HeroSection({ onOpenVidcon, onOpenPengaduan }: HeroSecti
               </div>
               <Sparkles className="w-4 h-4 text-indigo-900 animate-pulse" />
             </Link>
-          </motion.div>
+          </Muncul>
 
           {/* Feature Guarantees Badges */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
+          <Muncul
+            pemicu="segera"
+            delay={0.4}
             className="pt-4 flex flex-wrap items-center justify-center gap-6 text-xs font-semibold text-slate-600"
           >
             <div className="flex items-center gap-2">
@@ -206,14 +188,14 @@ export default function HeroSection({ onOpenVidcon, onOpenPengaduan }: HeroSecti
               <Lock className="w-4 h-4 text-cyan-500" />
               <span>Data Resmi BPS RI</span>
             </div>
-          </motion.div>
+          </Muncul>
         </div>
 
         {/* 5 DISTINCT SERVICE SHOWCASE GRID */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.5 }}
+        <Muncul
+          pemicu="segera"
+          duration={0.7}
+          delay={0.5}
           className="mt-14 glass-card p-6 sm:p-8 rounded-3xl border border-slate-200/90 shadow-xl relative overflow-hidden"
         >
           {/* Header Row */}
@@ -267,7 +249,7 @@ export default function HeroSection({ onOpenVidcon, onOpenPengaduan }: HeroSecti
               );
             })}
           </div>
-        </motion.div>
+        </Muncul>
       </div>
     </section>
   );

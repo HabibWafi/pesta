@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import Muncul from "@/components/ui/Muncul";
 import { RotateCcw, Home, AlertOctagon, ShieldAlert } from "lucide-react";
 
 export default function Error({
@@ -25,10 +25,10 @@ export default function Error({
 
       <div className="max-w-xl w-full text-center space-y-8 relative z-10">
         {/* Brand Header */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
+        <Muncul
+          pemicu="segera"
+          arah="skala"
+          duration={0.5}
           className="inline-flex items-center gap-3 bg-slate-800/80 p-2.5 px-5 rounded-full border border-slate-700 backdrop-blur-md shadow-xl"
         >
           <div className="w-8 h-8 rounded-xl bg-white p-0.5 shadow-md flex items-center justify-center">
@@ -43,13 +43,12 @@ export default function Error({
           <span className="font-extrabold text-sm tracking-tight text-white">
             PESTA BPS Musi Rawas
           </span>
-        </motion.div>
+        </Muncul>
 
         {/* Error Alert Box */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
+        <Muncul
+          pemicu="segera"
+          delay={0.1}
           className="space-y-4"
         >
           <div className="w-20 h-20 rounded-3xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto shadow-2xl backdrop-blur-md">
@@ -69,13 +68,12 @@ export default function Error({
               <code>Error: {error.message}</code>
             </div>
           )}
-        </motion.div>
+        </Muncul>
 
         {/* Action Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+        <Muncul
+          pemicu="segera"
+          delay={0.2}
           className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2"
         >
           <button
@@ -93,7 +91,7 @@ export default function Error({
             <Home className="w-4 h-4" />
             <span>Kembali ke Beranda</span>
           </Link>
-        </motion.div>
+        </Muncul>
 
         <div className="pt-6 text-xs text-slate-500 flex items-center justify-center gap-1.5">
           <ShieldAlert className="w-4 h-4 text-emerald-500" />
