@@ -262,6 +262,54 @@ export const healthResponseSchema = z.object({
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
 
 // ===========================================================================
+// Ringkasan keadaan (dipakai panel kendali di PC, WAJIB kunci API)
+// ===========================================================================
+
+/**
+ * Bentuk lengkap keadaan Beregam.
+ *
+ * Terpisah dari `healthResponseSchema` dan sengaja tidak boleh digabung.
+ * `/health` dipanggil UptimeRobot tanpa kunci API, jadi isinya harus tetap
+ * ringkas - jumlah antrean, sesi yang sedang ditangani petugas, dan siapa
+ * pemegang sewa adalah keadaan dalam yang tidak boleh terbaca publik.
+ *
+ * Endpoint ini menjawab pertanyaan yang muncul saat ada gangguan: apakah
+ * pesan menumpuk, apakah ada yang gagal kirim, apakah bot sedang dimatikan.
+ */
+export const statusResponseSchema = z.object({
+  serverTime: z.string(),
+  /** Saklar darurat dari panel admin. */
+  botEnabled: z.boolean(),
+  /** Worker yang sedang memegang sewa, null bila tidak ada. */
+  activeWorkerId: z.string().nullable(),
+  leaseExpiresAt: z.string().nullable(),
+  workerLastSeenAt: z.string().nullable(),
+  waSessionStatus: z.string().nullable(),
+  outbox: z.object({
+    pending: z.number().int(),
+    locked: z.number().int(),
+    sent: z.number().int(),
+    failed: z.number().int(),
+    cancelled: z.number().int(),
+    /** Umur antrean tertua yang belum terkirim, dalam detik. */
+    tertuaDetik: z.number().int().nullable(),
+  }),
+  pesan: z.object({
+    masukHariIni: z.number().int(),
+    keluarHariIni: z.number().int(),
+  }),
+  sesi: z.object({
+    total: z.number().int(),
+    /** Sesi yang sedang dipegang petugas - bot wajib diam untuk ini. */
+    manual: z.number().int(),
+  }),
+  /** Peringatan yang masih terbuka. */
+  alertTerbuka: z.number().int(),
+});
+
+export type StatusResponse = z.infer<typeof statusResponseSchema>;
+
+// ===========================================================================
 // Bentuk galat yang seragam
 // ===========================================================================
 

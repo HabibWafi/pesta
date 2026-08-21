@@ -304,3 +304,70 @@ export async function pesanTerakhir(contactId: number, direction: "in" | "out") 
     .limit(1);
   return baris ?? null;
 }
+
+/**
+ * Ringkasan keadaan untuk panel kendali di PC kantor.
+ *
+ * Semua hitungan diambil dalam satu perjalanan ke database. Panel memanggil
+ * ini berulang kali - sekali tiap beberapa detik - dan Hostinger punya batas
+ * Entry Process, jadi satu query gabungan jauh lebih murah daripada sepuluh
+ * query kecil yang masing-masing meminjam koneksi dari pool.
+ */
+export async function ringkasanStatus() {
+  const health = await ambilHealth();
+
+  const awalHariUtc = new Date();
+  awalHariUtc.setUTCHours(0, 0, 0, 0);
+
+  const hasil = await db.execute(sql`
+    SELECT
+      (SELECT COUNT(*) FROM beregam_outbox WHERE status = 'pending')   AS pending,
+      (SELECT COUNT(*) FROM beregam_outbox WHERE status = 'locked')    AS locked,
+      (SELECT COUNT(*) FROM beregam_outbox WHERE status = 'sent')      AS sent,
+      (SELECT COUNT(*) FROM beregam_outbox WHERE status = 'failed')    AS failed,
+      (SELECT COUNT(*) FROM beregam_outbox WHERE status = 'cancelled') AS cancelled,
+      (SELECT MIN(created_at) FROM beregam_outbox WHERE status IN ('pending','locked')) AS tertua,
+      (SELECT COUNT(*) FROM beregam_messages
+         WHERE direction = 'in'  AND created_at >= ${awalHariUtc})     AS masuk,
+      (SELECT COUNT(*) FROM beregam_messages
+         WHERE direction = 'out' AND created_at >= ${awalHariUtc})     AS keluar,
+      (SELECT COUNT(*) FROM beregam_sessions)                          AS sesi,
+      (SELECT COUNT(*) FROM beregam_sessions WHERE mode = 'manual')    AS manual,
+      (SELECT COUNT(*) FROM beregam_alerts WHERE resolved_at IS NULL)  AS alert
+  `);
+
+  // Driver mysql2 mengembalikan [baris, keterangan kolom]; tipe bawaan
+  // Drizzle untuk execute() tidak membedakan SELECT dari INSERT, jadi
+  // bentuknya ditegaskan di sini - satu-satunya tempat yang perlu tahu.
+  const baris = (hasil as unknown as [Record<string, unknown>[], unknown])[0]?.[0];
+
+  const r = baris ?? {};
+  const angka = (v: unknown) => Number(v ?? 0);
+
+  // Umur antrean tertua dihitung di Node, bukan di SQL: zona waktu MySQL
+  // belum tentu UTC, sedangkan seluruh timestamp disimpan dalam UTC.
+  const tertua = r.tertua ? new Date(`${String(r.tertua).replace(" ", "T")}Z`) : null;
+  const tertuaDetik =
+    tertua && !Number.isNaN(tertua.getTime())
+      ? Math.max(0, Math.floor((Date.now() - tertua.getTime()) / 1000))
+      : null;
+
+  return {
+    botEnabled: Boolean(health?.botEnabled),
+    activeWorkerId: health?.activeWorkerId ?? null,
+    leaseExpiresAt: health?.leaseExpiresAt?.toISOString() ?? null,
+    workerLastSeenAt: health?.workerLastSeenAt?.toISOString() ?? null,
+    waSessionStatus: health?.waSessionStatus ?? null,
+    outbox: {
+      pending: angka(r.pending),
+      locked: angka(r.locked),
+      sent: angka(r.sent),
+      failed: angka(r.failed),
+      cancelled: angka(r.cancelled),
+      tertuaDetik,
+    },
+    pesan: { masukHariIni: angka(r.masuk), keluarHariIni: angka(r.keluar) },
+    sesi: { total: angka(r.sesi), manual: angka(r.manual) },
+    alertTerbuka: angka(r.alert),
+  };
+}
