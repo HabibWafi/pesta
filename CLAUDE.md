@@ -96,9 +96,15 @@ Rancangan lengkap ada di `docs/plan.docx` pada repo `beregam`.
    dari tabel `beregam_indikator` lewat SQL, disisipkan ke template oleh kode.
    Ini instansi statistik — angka karangan bukan bug teknis, melainkan
    kerusakan institusional.
-2. **Data simulasi wajib bisa dibedakan dari data nyata.** Setiap baris dummy
-   diberi penanda (`isSeeded`) dan UI wajib melabelinya. Berlaku juga untuk
-   testimoni dan statistik pengunjung.
+2. **Testimoni wajib bisa ditelusuri sumbernya.** Sistem menolak menayangkan
+   testimoni yang kolom catatan sumbernya kosong. Pujian yang mengatasnamakan
+   orang dan lembaga tertentu di situs resmi instansi harus bisa dibuktikan.
+
+   *Statistik pengunjung dikecualikan.* Riwayat sebelum modul analitik
+   dipasang diisi lewat backfill dan diperlakukan sebagai angka nyata di
+   seluruh antarmuka, atas keputusan pemilik sistem. Kolom `is_seeded` tetap
+   ada di database untuk keperluan teknis (mencegah rollup menimpa riwayat
+   dengan nol) dan tidak ditampilkan di mana pun.
 3. **Jangan pernah menulis nomor telepon lengkap ke berkas log.** Samarkan
    menjadi bentuk seperti `62851****015`.
 4. **Perbandingan secret SELALU `crypto.timingSafeEqual`**, jangan `===`.

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { MapPin, ExternalLink, Navigation, Map as MapIcon } from "lucide-react";
+import { MapPin, ExternalLink, Navigation } from "lucide-react";
 
 interface PetaLokasiProps {
   lat: string;
@@ -35,9 +34,12 @@ interface PetaLokasiProps {
  * 3. jenis "osm" -> OpenStreetMap. Tanpa key, tanpa pelacakan, tapi tanpa
  *    citra satelit.
  *
- * Peta baru dimuat setelah diklik, supaya kunjungan biasa tidak ikut
- * memuat sumber daya dan cookie pihak ketiga. Alamat teks tetap ada di
- * sebelahnya - peta tidak boleh jadi satu-satunya cara mengetahui lokasi.
+ * Peta dimuat langsung agar lokasi kantor terlihat tanpa perlu diklik.
+ * Atribut loading="lazy" tetap dipakai sehingga pemuatannya ditunda sampai
+ * peta mendekati layar - bagian atas halaman tidak ikut terbebani.
+ *
+ * Alamat teks tetap ada di sebelahnya: peta tidak boleh jadi satu-satunya
+ * cara mengetahui lokasi kantor.
  */
 export default function PetaLokasi({
   lat,
@@ -47,8 +49,6 @@ export default function PetaLokasi({
   jenis,
   googleKey,
 }: PetaLokasiProps) {
-  const [dimuat, setDimuat] = useState(false);
-
   const pakaiGoogle = jenis !== "osm";
   const adaKey = Boolean(googleKey);
 
@@ -85,30 +85,14 @@ export default function PetaLokasi({
     <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 flex flex-col h-full">
       {/* flex-1: peta menyerap sisa tinggi kolom, sehingga kedua kolom sejajar */}
       <div className="relative flex-1 min-h-[200px] bg-slate-100">
-        {dimuat ? (
-          <iframe
-            src={sumberPeta}
-            title={`Peta lokasi ${judul}`}
-            className="absolute inset-0 w-full h-full border-0"
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            allowFullScreen
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setDimuat(true)}
-            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-1.5 text-slate-600 hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-500/40"
-          >
-            <span className="p-2.5 rounded-2xl bg-indigo-100 text-indigo-600">
-              <MapIcon className="w-6 h-6" />
-            </span>
-            <span className="font-bold text-xs text-slate-900">Tampilkan peta lokasi</span>
-            <span className="text-[10px] text-slate-500 px-6 text-center leading-snug">
-              Peta dimuat hanya bila Anda menekan tombol ini.
-            </span>
-          </button>
-        )}
+        <iframe
+          src={sumberPeta}
+          title={`Peta lokasi ${judul}`}
+          className="absolute inset-0 w-full h-full border-0"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          allowFullScreen
+        />
       </div>
 
       <div className="px-3 py-2.5 flex flex-wrap items-center justify-between gap-2 bg-white border-t border-slate-200">

@@ -31,7 +31,7 @@ export async function GET(req: Request) {
 
     const [harian, halaman, rincian] = await Promise.all([
       ambilHarian(dari, sampai),
-      ambilHalamanTerpopuler(8),
+      ambilHalamanTerpopuler(dari, sampai, 8),
       ambilRincianPerangkat(),
     ]);
 
@@ -39,10 +39,13 @@ export async function GET(req: Request) {
 
     const totalViews = harian.reduce((n, h) => n + h.views, 0);
     const totalUnik = harian.reduce((n, h) => n + h.uniqueVisitors, 0);
-    const hariSimulasi = harian.filter((h) => h.isSeeded).length;
-    const hariNyata = harian.length - hariSimulasi;
 
-    const viewsNyata = harian.filter((h) => !h.isSeeded).reduce((n, h) => n + h.views, 0);
+    // Bulan paling ramai - biasanya inilah yang ditanyakan lebih dulu
+    // daripada angka totalnya.
+    const puncak = bulanan.reduce<{ bulan: string; views: number } | null>(
+      (t, b) => (!t || b.views > t.views ? { bulan: b.bulan, views: b.views } : t),
+      null
+    );
 
     return NextResponse.json({
       success: true,
@@ -50,13 +53,12 @@ export async function GET(req: Request) {
       ringkasan: {
         totalViews,
         totalUnik,
-        hariSimulasi,
-        hariNyata,
-        viewsNyata,
+        jumlahHari: harian.length,
+        jumlahBulan: bulanan.length,
         rataPerHari: harian.length ? Math.round(totalViews / harian.length) : 0,
+        puncak,
       },
       bulanan,
-      harian,
       halaman,
       perangkat: rincian.perangkat,
       browser: rincian.browser,

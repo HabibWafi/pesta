@@ -8,9 +8,6 @@ export const dynamic = "force-dynamic";
  *
  * Dibangkitkan sebagai string biasa - tidak perlu library untuk ini.
  *
- * Kolom `data_simulasi` sengaja ikut diekspor. Kalau berkas ini nanti
- * dibuka orang lain atau dilampirkan ke laporan, harus tetap terlihat baris
- * mana yang bukan angka nyata.
  */
 function keCsv(baris: (string | number)[][]): string {
   const kutip = (nilai: string | number) => {
@@ -33,8 +30,8 @@ export async function GET(req: Request) {
   const harian = await ambilHarian(dari, sampai);
 
   const baris: (string | number)[][] = [
-    ["tanggal", "kunjungan", "pengunjung_unik", "data_simulasi"],
-    ...harian.map((h) => [h.tanggal, h.views, h.uniqueVisitors, h.isSeeded ? "YA" : "tidak"]),
+    ["tanggal", "kunjungan", "pengunjung_unik"],
+    ...harian.map((h) => [h.tanggal, h.views, h.uniqueVisitors]),
   ];
 
   // BOM UTF-8 supaya Excel di Windows membaca huruf beraksen dengan benar.

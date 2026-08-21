@@ -158,7 +158,7 @@ export default function HeroSection({ onOpenVidcon, onOpenPengaduan }: HeroSecti
               </span>
             </button>
 
-            {/* Button 2: Form Pengaduan */}
+            {/* Tombol 2: Form Aduan */}
             <button
               onClick={onOpenPengaduan}
               className="group relative flex items-center justify-between gap-2.5 px-5 py-4 rounded-2xl text-xs font-bold text-slate-800 bg-white hover:bg-slate-50 border border-slate-200/90 shadow-md transition-all duration-300 hover:-translate-y-1 active:translate-y-0"
@@ -167,7 +167,7 @@ export default function HeroSection({ onOpenVidcon, onOpenPengaduan }: HeroSecti
                 <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
                   <ShieldAlert className="w-4 h-4" />
                 </div>
-                <span className="tracking-tight font-extrabold text-left">Form Pengaduan</span>
+                <span className="tracking-tight font-extrabold text-left">Form Aduan</span>
               </div>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 transition-colors" />
             </button>

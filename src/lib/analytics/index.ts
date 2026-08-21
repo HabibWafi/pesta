@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { analyticsDaily, analyticsEvents } from "@/lib/db/schema";
+import { analyticsDaily, analyticsEvents, analyticsPathDaily } from "@/lib/db/schema";
 
 /**
  * Analitik pengunjung, self-hosted.
@@ -92,8 +92,9 @@ function tanggalHariIni(): string {
  * Dipanggil dari /api/track dengan gerbang waktu - pola yang sama dengan
  * runMaintenance() Beregam, sehingga tidak butuh cron sama sekali.
  *
- * Baris bertanda isSeeded TIDAK PERNAH ditimpa. Data simulasi dan data
- * nyata tidak boleh saling mengotori.
+ * Baris riwayat hasil backfill (isSeeded) tidak pernah ditimpa. Data
+ * mentahnya memang tidak pernah ada, jadi menghitung ulang dari sana hanya
+ * akan menulis nol ke atas riwayat yang sudah benar.
  */
 export async function hitungRollup(tanggal = tanggalHariIni()): Promise<void> {
   const [ada] = await db
@@ -124,6 +125,53 @@ export async function hitungRollup(tanggal = tanggalHariIni()): Promise<void> {
     await db
       .insert(analyticsDaily)
       .values({ tanggal, views, uniqueVisitors: unik, isSeeded: false });
+  }
+
+  await hitungRollupHalaman(tanggal);
+}
+
+/**
+ * Rollup per halaman untuk hari tertentu.
+ *
+ * Dipisah dari data mentah supaya "Halaman Terpopuler" tetap punya riwayat
+ * setelah analytics_events dibersihkan pada usia 90 hari.
+ */
+async function hitungRollupHalaman(tanggal: string): Promise<void> {
+  const perHalaman = await db
+    .select({
+      path: analyticsEvents.path,
+      views: sql<number>`count(*)`,
+      unik: sql<number>`count(distinct ${analyticsEvents.visitorHash})`,
+    })
+    .from(analyticsEvents)
+    .where(sql`date(${analyticsEvents.createdAt}) = ${tanggal}`)
+    .groupBy(analyticsEvents.path);
+
+  for (const h of perHalaman) {
+    const [ada] = await db
+      .select({ id: analyticsPathDaily.id, isSeeded: analyticsPathDaily.isSeeded })
+      .from(analyticsPathDaily)
+      .where(and(eq(analyticsPathDaily.tanggal, tanggal), eq(analyticsPathDaily.path, h.path)))
+      .limit(1);
+
+    // Baris backfill tidak ditimpa - kalau tidak, riwayat lama akan
+    // ditulis ulang jadi nol setiap kali rollup berjalan.
+    if (ada?.isSeeded) continue;
+
+    if (ada) {
+      await db
+        .update(analyticsPathDaily)
+        .set({ views: Number(h.views), uniqueVisitors: Number(h.unik) })
+        .where(eq(analyticsPathDaily.id, ada.id));
+    } else {
+      await db.insert(analyticsPathDaily).values({
+        tanggal,
+        path: h.path,
+        views: Number(h.views),
+        uniqueVisitors: Number(h.unik),
+        isSeeded: false,
+      });
+    }
   }
 }
 
@@ -187,8 +235,8 @@ export interface RingkasanBulanan {
   bulan: string;
   views: number;
   uniqueVisitors: number;
-  /** true bila ada satu saja hari simulasi di bulan itu. */
-  adaSimulasi: boolean;
+  /** Selisih persen terhadap bulan sebelumnya. null untuk bulan pertama. */
+  perubahanPersen: number | null;
 }
 
 /** Meringkas rollup harian menjadi bulanan. */
@@ -196,26 +244,42 @@ export function ringkasBulanan(harian: RingkasanHarian[]): RingkasanBulanan[] {
   const peta = new Map<string, RingkasanBulanan>();
   for (const h of harian) {
     const bulan = h.tanggal.slice(0, 7);
-    const b = peta.get(bulan) ?? { bulan, views: 0, uniqueVisitors: 0, adaSimulasi: false };
+    const b = peta.get(bulan) ?? { bulan, views: 0, uniqueVisitors: 0, perubahanPersen: null };
     b.views += h.views;
     b.uniqueVisitors += h.uniqueVisitors;
-    if (h.isSeeded) b.adaSimulasi = true;
     peta.set(bulan, b);
   }
-  return [...peta.values()].sort((a, b) => a.bulan.localeCompare(b.bulan));
+
+  const urut = [...peta.values()].sort((a, b) => a.bulan.localeCompare(b.bulan));
+
+  // Perubahan terhadap bulan sebelumnya - ini yang biasanya ditanyakan
+  // pimpinan, bukan angka mentahnya saja.
+  for (let i = 1; i < urut.length; i += 1) {
+    const lalu = urut[i - 1].views;
+    if (lalu > 0) {
+      urut[i].perubahanPersen = ((urut[i].views - lalu) / lalu) * 100;
+    }
+  }
+  return urut;
 }
 
-/** Halaman terpopuler dari data mentah (hanya data nyata, 90 hari terakhir). */
-export async function ambilHalamanTerpopuler(batas = 10) {
+/**
+ * Halaman terpopuler dalam rentang tanggal.
+ *
+ * Dibaca dari rollup per halaman, bukan dari data mentah, sehingga riwayat
+ * lama tetap terhitung meski baris mentahnya sudah dibersihkan.
+ */
+export async function ambilHalamanTerpopuler(dari: string, sampai: string, batas = 10) {
   return db
     .select({
-      path: analyticsEvents.path,
-      views: sql<number>`count(*)`,
-      unik: sql<number>`count(distinct ${analyticsEvents.visitorHash})`,
+      path: analyticsPathDaily.path,
+      views: sql<number>`sum(${analyticsPathDaily.views})`,
+      unik: sql<number>`sum(${analyticsPathDaily.uniqueVisitors})`,
     })
-    .from(analyticsEvents)
-    .groupBy(analyticsEvents.path)
-    .orderBy(desc(sql`count(*)`))
+    .from(analyticsPathDaily)
+    .where(and(gte(analyticsPathDaily.tanggal, dari), lte(analyticsPathDaily.tanggal, sampai)))
+    .groupBy(analyticsPathDaily.path)
+    .orderBy(desc(sql`sum(${analyticsPathDaily.views})`))
     .limit(batas);
 }
 

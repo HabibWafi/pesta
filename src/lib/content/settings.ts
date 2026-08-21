@@ -85,8 +85,10 @@ export const DEFINISI_SETTING = {
   "peta.zoom": {
     grup: "peta",
     label: "Tingkat perbesaran",
-    bantuan: "Angka 1 (dunia) sampai 21 (paling dekat). Wajar: 17-19.",
-    bawaan: "18",
+    bantuan:
+      "Angka 1 (dunia) sampai 21 (paling dekat). 16 memperlihatkan kompleks " +
+      "perkantoran beserta jalan sekitarnya; 18 ke atas terlalu rapat.",
+    bawaan: "16",
   },
   "peta.judul": {
     grup: "peta",

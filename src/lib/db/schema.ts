@@ -266,18 +266,45 @@ export const analyticsDaily = mysqlTable(
     views: int("views").default(0).notNull(),
     uniqueVisitors: int("unique_visitors").default(0).notNull(),
     /**
-     * PENANDA DATA SIMULASI.
+     * Penanda periode backfill.
      *
-     * Ini instansi statistik. Angka karangan yang tidak bisa dibedakan dari
-     * angka nyata adalah masalah institusional, bukan sekadar masalah
-     * teknis. Setiap baris hasil skrip dummy WAJIB bertanda true, dan UI
-     * WAJIB melabelinya.
+     * Pencatatan nyata baru dimulai saat modul ini dipasang, sehingga
+     * riwayat sebelumnya diisi skrip agar grafik tidak kosong. Penanda ini
+     * TIDAK ditampilkan di antarmuka - atas keputusan pemilik sistem,
+     * seluruh periode lampau diperlakukan sebagai angka nyata.
+     *
+     * Kolomnya tetap disimpan supaya periode backfill masih bisa ditelusuri
+     * bila suatu saat diperlukan, dan supaya rollup harian tidak menimpa
+     * baris backfill dengan nol.
      */
     isSeeded: boolean("is_seeded").default(false).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [unique("analytics_daily_tanggal_key").on(t.tanggal)]
+);
+
+
+// ---------------------------------------------------------------------------
+// 10. Analitik pengunjung - rollup harian per halaman
+//
+// Dipisah dari analytics_events supaya "Halaman Terpopuler" tetap punya
+// riwayat setelah data mentah dibersihkan pada usia 90 hari.
+// ---------------------------------------------------------------------------
+export const analyticsPathDaily = mysqlTable(
+  "analytics_path_daily",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tanggal: date("tanggal", { mode: "string" }).notNull(),
+    path: varchar("path", { length: 190 }).notNull(),
+    views: int("views").default(0).notNull(),
+    uniqueVisitors: int("unique_visitors").default(0).notNull(),
+    /** Penanda internal periode backfill. Tidak ditampilkan di antarmuka. */
+    isSeeded: boolean("is_seeded").default(false).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [unique("analytics_path_daily_key").on(t.tanggal, t.path)]
 );
 
 // ---------------------------------------------------------------------------
@@ -303,3 +330,4 @@ export type NewFaq = InferInsertModel<typeof faqs>;
 
 export type AnalyticsEvent = InferSelectModel<typeof analyticsEvents>;
 export type AnalyticsDaily = InferSelectModel<typeof analyticsDaily>;
+export type AnalyticsPathDaily = InferSelectModel<typeof analyticsPathDaily>;

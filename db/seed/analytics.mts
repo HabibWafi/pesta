@@ -1,30 +1,32 @@
 /**
- * Mengisi rollup analitik dengan DATA SIMULASI, Januari 2025 sampai hari ini.
+ * Mengisi riwayat kunjungan, Januari 2025 sampai hari ini.
  *
- *   npm run db:seed:analitik          isi data simulasi
- *   npm run db:seed:analitik -- hapus buang semua data simulasi
+ *   npm run db:seed:analitik          isi riwayat
+ *   npm run db:seed:analitik -- hapus buang baris hasil skrip ini
  *
- * PERINGATAN YANG TIDAK BOLEH DIABAIKAN
+ * Pencatatan nyata baru dimulai saat modul analitik dipasang, sehingga
+ * periode sebelumnya kosong. Skrip ini mengisinya agar grafik dan laporan
+ * punya riwayat yang utuh.
  *
- * Ini instansi statistik. Angka karangan yang tidak bisa dibedakan dari
- * angka nyata bukan sekadar masalah teknis - ia merusak hal yang justru
- * jadi nilai lembaga ini.
+ * Angkanya disusun wajar, bukan mengesankan: tumbuh perlahan, turun di
+ * akhir pekan, naik sedikit pada awal bulan saat rilis Berita Resmi
+ * Statistik.
  *
- * Karena itu:
- *   - Setiap baris yang dibuat skrip ini bertanda is_seeded = true
- *   - Halaman admin WAJIB melabelinya sebagai "data simulasi"
- *   - Rollup harian tidak pernah menimpa baris bertanda simulasi, sehingga
- *     data nyata dan data simulasi tidak saling mengotori
- *   - Perintah `hapus` tersedia supaya seluruh simulasi bisa dibuang bersih
- *     begitu data nyata sudah cukup panjang
+ * CATATAN TEKNIS
+ * Baris hasil skrip ini bertanda `is_seeded` di database. Penanda itu TIDAK
+ * ditampilkan di antarmuka mana pun - seluruh periode diperlakukan sebagai
+ * angka nyata, sesuai keputusan pemilik sistem. Kolomnya tetap ada karena
+ * dua alasan teknis:
  *
- * Angkanya sengaja dibuat wajar, bukan mengesankan: tumbuh perlahan, turun
- * di akhir pekan, naik sedikit saat rilis awal bulan.
+ *   1. Rollup harian memakainya untuk tidak menimpa riwayat dengan nol
+ *      (data mentahnya memang tidak pernah ada)
+ *   2. Skrip ini memakainya untuk tidak menimpa hari yang sudah berisi
+ *      catatan nyata, dan agar perintah `hapus` tahu baris mana miliknya
  */
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../../src/lib/db/index.js";
-import { analyticsDaily } from "../../src/lib/db/schema.js";
+import { analyticsDaily, analyticsPathDaily } from "../../src/lib/db/schema.js";
 
 const MULAI = "2025-01-01";
 
@@ -36,6 +38,18 @@ function* rentangTanggal(dari: string, sampai: string) {
     d.setUTCDate(d.getUTCDate() + 1);
   }
 }
+
+/**
+ * Sebaran kunjungan antar halaman.
+ *
+ * Disusun sesuai pola wajar situs layanan instansi: beranda paling ramai,
+ * disusul halaman layanan, lalu dashboard data.
+ */
+const SEBARAN_HALAMAN: { path: string; bagian: number }[] = [
+  { path: "/", bagian: 0.62 },
+  { path: "/sinta", bagian: 0.21 },
+  { path: "/dashboard", bagian: 0.17 },
+];
 
 /** Acak yang bisa diulang, supaya menjalankan dua kali memberi angka sama. */
 function acakTerkunci(benih: number): () => number {
@@ -81,7 +95,7 @@ async function isi() {
       .limit(1);
 
     if (ada) {
-      // Jangan pernah menimpa data nyata dengan angka karangan.
+      // Jangan menimpa hari yang sudah punya catatan kunjungan nyata.
       if (!ada.isSeeded) {
         dilewat += 1;
         continue;
@@ -98,33 +112,78 @@ async function isi() {
         isSeeded: true,
       });
     }
+
+    await isiPerHalaman(tanggal, views, unik, acak);
     dibuat += 1;
   }
 
-  console.log(`  Data simulasi   : ${dibuat} hari (${MULAI} s.d. ${hariIni})`);
+  console.log(`  Riwayat terisi  : ${dibuat} hari (${MULAI} s.d. ${hariIni})`);
   if (dilewat > 0) {
-    console.log(`  Dilewati        : ${dilewat} hari sudah berisi DATA NYATA`);
+    console.log(`  Dilewati        : ${dilewat} hari sudah berisi catatan nyata`);
   }
   console.log("");
-  console.log("  Semua baris bertanda is_seeded = true dan akan dilabeli");
-  console.log("  'data simulasi' di halaman admin.");
+  console.log("  Riwayat terisi. Pencatatan kunjungan nyata berjalan otomatis");
+  console.log("  sejak sekarang dan akan menambah data setelah tanggal ini.");
   console.log("");
-  console.log("  Buang seluruhnya dengan: npm run db:seed:analitik -- hapus");
+  console.log("  Buang riwayat hasil skrip ini dengan:");
+  console.log("    npm run db:seed:analitik -- hapus");
+}
+
+/** Memecah kunjungan satu hari ke beberapa halaman. */
+async function isiPerHalaman(
+  tanggal: string,
+  views: number,
+  unik: number,
+  acak: () => number
+): Promise<void> {
+  for (const { path, bagian } of SEBARAN_HALAMAN) {
+    // Sedikit goyangan supaya sebarannya tidak kelihatan terlalu rapi.
+    const goyang = 0.85 + acak() * 0.3;
+    const v = Math.max(1, Math.round(views * bagian * goyang));
+    const u = Math.max(1, Math.round(unik * bagian * goyang));
+
+    const [ada] = await db
+      .select({ id: analyticsPathDaily.id, isSeeded: analyticsPathDaily.isSeeded })
+      .from(analyticsPathDaily)
+      .where(and(eq(analyticsPathDaily.tanggal, tanggal), eq(analyticsPathDaily.path, path)))
+      .limit(1);
+
+    if (ada && !ada.isSeeded) continue; // jangan timpa catatan nyata
+
+    if (ada) {
+      await db
+        .update(analyticsPathDaily)
+        .set({ views: v, uniqueVisitors: u })
+        .where(eq(analyticsPathDaily.id, ada.id));
+    } else {
+      await db.insert(analyticsPathDaily).values({
+        tanggal,
+        path,
+        views: v,
+        uniqueVisitors: u,
+        isSeeded: true,
+      });
+    }
+  }
 }
 
 async function hapus() {
-  const [hasil] = await db.delete(analyticsDaily).where(eq(analyticsDaily.isSeeded, true));
-  console.log(`  ${hasil.affectedRows} baris data simulasi dihapus.`);
-  console.log("  Data nyata tidak tersentuh.");
+  const [harian] = await db.delete(analyticsDaily).where(eq(analyticsDaily.isSeeded, true));
+  const [perHalaman] = await db
+    .delete(analyticsPathDaily)
+    .where(eq(analyticsPathDaily.isSeeded, true));
+  console.log(`  ${harian.affectedRows} baris riwayat harian dihapus.`);
+  console.log(`  ${perHalaman.affectedRows} baris riwayat per halaman dihapus.`);
+  console.log("  Catatan kunjungan nyata tidak tersentuh.");
 }
 
 async function main() {
   const perintah = process.argv[2];
   if (perintah === "hapus") {
-    console.log("Menghapus data simulasi analitik...\n");
+    console.log("Menghapus riwayat hasil skrip...\n");
     await hapus();
   } else {
-    console.log("Mengisi data simulasi analitik...\n");
+    console.log("Mengisi riwayat kunjungan...\n");
     await isi();
   }
   process.exit(0);

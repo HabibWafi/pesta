@@ -6,7 +6,7 @@ export interface TitikBulanan {
   bulan: string;
   views: number;
   uniqueVisitors: number;
-  adaSimulasi: boolean;
+  perubahanPersen: number | null;
 }
 
 const NAMA_BULAN = [
@@ -26,9 +26,8 @@ function labelBulan(bulan: string): string {
  * tidak menambah dependency demi hal yang bisa digambar dengan beberapa
  * puluh baris.
  *
- * Batang periode DATA SIMULASI diberi arsir dan warna berbeda. Ini instansi
- * statistik; angka karangan harus bisa dibedakan sekilas dari angka nyata,
- * bukan hanya disebut di keterangan kecil.
+ * Menyorot batang tertinggi supaya bulan puncak langsung terlihat tanpa
+ * perlu membandingkan angka satu per satu.
  */
 export default function GrafikBulanan({ data }: { data: TitikBulanan[] }) {
   const [aktif, setAktif] = useState<number | null>(null);
@@ -71,14 +70,6 @@ export default function GrafikBulanan({ data }: { data: TitikBulanan[] }) {
           aria-label={`Grafik kunjungan bulanan, ${data.length} bulan`}
           className="max-w-full"
         >
-          <defs>
-            {/* Arsir untuk menandai periode data simulasi */}
-            <pattern id="arsirSimulasi" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-              <rect width="6" height="6" fill="currentColor" className="text-amber-200 dark:text-amber-900" />
-              <line x1="0" y1="0" x2="0" y2="6" stroke="currentColor" strokeWidth="3" className="text-amber-400 dark:text-amber-700" />
-            </pattern>
-          </defs>
-
           {/* Garis bantu + angka sumbu */}
           {garis.map((nilai) => {
             const y = T + tinggiPlot - (nilai / atas) * tinggiPlot;
@@ -132,15 +123,14 @@ export default function GrafikBulanan({ data }: { data: TitikBulanan[] }) {
                   width={lebarBatang}
                   height={Math.max(h, 1)}
                   rx="3"
-                  fill={d.adaSimulasi ? "url(#arsirSimulasi)" : "currentColor"}
+                  fill="currentColor"
                   className={
-                    d.adaSimulasi
-                      ? ""
-                      : disorot
-                        ? "text-indigo-700 dark:text-indigo-400"
-                        : "text-indigo-500 dark:text-indigo-500"
+                    disorot
+                      ? "text-indigo-700 dark:text-indigo-300"
+                      : d.views === maks
+                        ? "text-indigo-600 dark:text-indigo-400"
+                        : "text-indigo-500/70 dark:text-indigo-500/70"
                   }
-                  opacity={disorot ? 1 : 0.92}
                 />
                 <text
                   x={x + lebarBatang / 2}
@@ -168,32 +158,24 @@ export default function GrafikBulanan({ data }: { data: TitikBulanan[] }) {
         </svg>
       </div>
 
-      {/* Keterangan */}
-      <div className="flex flex-wrap items-center gap-4 text-[10px] text-slate-500 dark:text-slate-400">
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-indigo-500" />
-          Data nyata
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span
-            className="w-3 h-3 rounded-sm border border-amber-400"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(45deg, rgb(251 191 36) 0 2px, rgb(254 243 199) 2px 5px)",
-            }}
-          />
-          Data simulasi - bukan angka kunjungan sebenarnya
-        </span>
-      </div>
-
       {aktif !== null && (
         <p className="text-[11px] text-slate-600 dark:text-slate-300">
           <strong>{labelBulan(data[aktif].bulan)}</strong>
           {" - "}
           {data[aktif].views.toLocaleString("id-ID")} kunjungan,{" "}
           {data[aktif].uniqueVisitors.toLocaleString("id-ID")} pengunjung unik
-          {data[aktif].adaSimulasi && (
-            <span className="text-amber-700 dark:text-amber-400 font-bold"> (data simulasi)</span>
+          {data[aktif].perubahanPersen !== null && (
+            <span
+              className={
+                data[aktif].perubahanPersen! >= 0
+                  ? "text-emerald-600 dark:text-emerald-400 font-bold"
+                  : "text-rose-600 dark:text-rose-400 font-bold"
+              }
+            >
+              {" "}
+              ({data[aktif].perubahanPersen! >= 0 ? "+" : ""}
+              {data[aktif].perubahanPersen!.toFixed(1)}% dari bulan sebelumnya)
+            </span>
           )}
         </p>
       )}
