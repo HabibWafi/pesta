@@ -228,6 +228,20 @@ npm run build
 npm run db:backup
 ```
 
+Siapkan SQL migration untuk phpMyAdmin Hostinger:
+
+```bash
+npm run db:sql -- sejak 0001
+```
+
+Periksa hasil deploy:
+
+```bash
+npm run cek:deploy -- https://bpskabmusirawas.com
+```
+
+Panduan deploy lengkap ada di `docs/DEPLOY.md`.
+
 Cek database lokal:
 
 ```bash

@@ -12,7 +12,8 @@
     "db:studio": "node --env-file=.env node_modules/drizzle-kit/bin.cjs studio",
     "db:sql": "node db/sql.mjs",
     "db:seed:konten": "node --env-file=.env --import tsx db/seed/content.mts",
-    "db:seed:analitik": "node --env-file=.env --import tsx db/seed/analytics.mts"
+    "db:seed:analitik": "node --env-file=.env --import tsx db/seed/analytics.mts",
+    "cek:deploy": "node db/cek-deploy.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",

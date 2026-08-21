@@ -9,9 +9,12 @@
  * membingungkan.
  *
  * Pakai:
- *   npm run db:sql              tampilkan migration terbaru
- *   npm run db:sql -- 0001      tampilkan migration dengan awalan 0001
- *   npm run db:sql -- 0001 > siap.sql
+ *   npm run db:sql                  migration terbaru saja
+ *   npm run db:sql -- 0002          migration dengan awalan 0002
+ *   npm run db:sql -- sejak 0001    gabungkan 0001 sampai terakhir
+ *   npm run db:sql -- semua         semua migration, untuk pemasangan baru
+ *
+ *   npm run db:sql -- sejak 0001 > untuk-hostinger.sql
  */
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -29,21 +32,51 @@ if (semua.length === 0) {
   process.exit(1);
 }
 
-const awalan = process.argv[2];
-const berkas = awalan ? semua.find((f) => f.startsWith(awalan)) : semua.at(-1);
-
-if (!berkas) {
-  console.error(`Tidak ada migration berawalan "${awalan}". Yang tersedia:`);
-  for (const f of semua) console.error("  " + f);
-  process.exit(1);
+/** Membuang penanda breakpoint agar isinya bisa dijalankan apa adanya. */
+function bersihkan(namaBerkas) {
+  return readFileSync(join(dirMigrations, namaBerkas), "utf8")
+    .split(/-->\s*statement-breakpoint/)
+    .map((bagian) => bagian.trim())
+    .filter(Boolean)
+    .join("\n\n");
 }
 
-const isi = readFileSync(join(dirMigrations, berkas), "utf8")
-  .split(/-->\s*statement-breakpoint/)
-  .map((bagian) => bagian.trim())
-  .filter(Boolean)
-  .join("\n\n");
+const argumen = process.argv.slice(2);
+let dipilih;
 
-console.error(`-- Sumber: db/migrations/${berkas}`);
-console.error("-- Salin isi di bawah ini, jalankan di phpMyAdmin hPanel.\n");
-console.log(isi);
+if (argumen[0] === "semua") {
+  dipilih = semua;
+} else if (argumen[0] === "sejak") {
+  const awalan = argumen[1];
+  const mulai = semua.findIndex((f) => f.startsWith(awalan));
+  if (mulai === -1) {
+    console.error(`Tidak ada migration berawalan "${awalan}". Yang tersedia:`);
+    for (const f of semua) console.error("  " + f);
+    process.exit(1);
+  }
+  dipilih = semua.slice(mulai);
+} else if (argumen[0]) {
+  const satu = semua.find((f) => f.startsWith(argumen[0]));
+  if (!satu) {
+    console.error(`Tidak ada migration berawalan "${argumen[0]}". Yang tersedia:`);
+    for (const f of semua) console.error("  " + f);
+    process.exit(1);
+  }
+  dipilih = [satu];
+} else {
+  dipilih = [semua.at(-1)];
+}
+
+console.error(`-- ${dipilih.length} migration disiapkan:`);
+for (const f of dipilih) console.error(`--   ${f}`);
+console.error("-- Salin isi di bawah ini, jalankan di phpMyAdmin hPanel.");
+console.error("-- Jalankan berurutan dari atas ke bawah, jangan diacak.\n");
+
+const bagian = dipilih.map(
+  (f) => `-- =====================================================\n` +
+         `-- ${f}\n` +
+         `-- =====================================================\n` +
+         bersihkan(f)
+);
+
+console.log(bagian.join("\n\n"));
