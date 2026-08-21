@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { 
+  Download,
   Mail, 
   Search, 
   Filter, 
@@ -222,6 +223,14 @@ export default function AdminContactPage() {
             Inbox formulir pertanyaan & konsultasi umum dari website PESTA (Total: {totalItems} Pesan)
           </p>
         </div>
+
+        <a
+          href="/api/admin/ekspor?jenis=kontak"
+          className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-xs inline-flex items-center gap-2 shrink-0"
+          title="Unduh seluruh data sebagai berkas CSV"
+        >
+          <Download className="w-4 h-4" /> Ekspor CSV
+        </a>
       </div>
 
       {/* Filters & Search */}

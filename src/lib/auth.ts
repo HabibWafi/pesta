@@ -23,6 +23,10 @@ function getJwtSecret(): string {
   return secret;
 }
 
+/** Peran yang dikenal sistem. SUPERADMIN mencakup semua kewenangan ADMIN. */
+export const ROLE = { ADMIN: "ADMIN", SUPERADMIN: "SUPERADMIN" } as const;
+export type Role = (typeof ROLE)[keyof typeof ROLE];
+
 export interface AdminPayload {
   id: number;
   name: string;
@@ -55,4 +59,28 @@ export async function getAdminSession(): Promise<AdminPayload | null> {
 
 export function getAdminTokenCookieName(): string {
   return TOKEN_COOKIE_NAME;
+}
+
+/**
+ * Memastikan pengguna yang login punya salah satu peran yang disebutkan.
+ *
+ * Kolom `role` sudah lama ada di tabel users tapi TIDAK PERNAH diperiksa di
+ * mana pun - artinya akun ADMIN biasa punya kewenangan yang sama persis
+ * dengan SUPERADMIN. Helper ini yang membuat pembedaannya nyata.
+ *
+ * Mengembalikan sesi bila berwenang, atau null bila tidak. Pemanggil yang
+ * memutuskan bentuk penolakannya (401 vs 403), supaya pesan untuk "belum
+ * login" dan "tidak berwenang" tidak tertukar.
+ */
+export async function requireRole(
+  ...peranYangBoleh: Role[]
+): Promise<{ sesi: AdminPayload | null; berwenang: boolean }> {
+  const sesi = await getAdminSession();
+  if (!sesi) return { sesi: null, berwenang: false };
+  return { sesi, berwenang: peranYangBoleh.includes(sesi.role as Role) };
+}
+
+/** Apakah sesi ini SUPERADMIN. */
+export function isSuperadmin(sesi: AdminPayload | null): boolean {
+  return sesi?.role === ROLE.SUPERADMIN;
 }

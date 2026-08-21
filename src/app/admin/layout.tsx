@@ -20,9 +20,11 @@ import {
   Sun,
   Moon,
   Settings2,
-  BarChart3
+  BarChart3,
+  ShieldCheck
 } from "lucide-react";
 import { toast } from "sonner";
+import LonengNotifikasi from "@/components/admin/LonengNotifikasi";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -105,6 +107,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Pesan Kontak PST", href: "/admin/contact", icon: Mail },
     { name: "Statistik Pengunjung", href: "/admin/analytics", icon: BarChart3 },
     { name: "Kelola Konten", href: "/admin/konten", icon: Settings2 },
+    { name: "Akun Administrator", href: "/admin/users", icon: ShieldCheck },
   ];
 
   if (loading) {
@@ -229,6 +232,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           {/* Right Actions: Theme Toggle + User Profile + Web Utama + Logout */}
           <div className="flex items-center gap-3">
+            <LonengNotifikasi gelap={theme === "dark"} />
+
             {/* Dark / Light Mode Switcher Toggle Button */}
             <button
               onClick={toggleTheme}

@@ -144,6 +144,42 @@ src/
 - Pesan untuk pengguna **berbahasa Indonesia**
 - Komentar kode berbahasa Indonesia — dibaca rekan kerja di BPS juga
 
+### Keamanan & peran
+
+- **`src/proxy.ts` menjaga semua `/admin/*` di sisi server.** Konvensi Next 16
+  (pengganti `middleware`). Selalu jalan di runtime Node, jadi `jsonwebtoken`
+  bisa dipakai langsung dan **tidak boleh** mengekspor `runtime`.
+- Route `/api/admin/*` **tetap** memanggil `getAdminSession()` sendiri.
+  Jangan mengandalkan proxy saja - kalau berkas itu diubah atau dilewati,
+  endpoint harus tetap terlindungi.
+- Kewenangan khusus SUPERADMIN dijaga `requireRole(ROLE.SUPERADMIN)` di
+  `src/lib/auth.ts`. Bedakan penolakannya: **401** untuk belum login,
+  **403** untuk sudah login tapi tidak berwenang.
+- **Hash password tidak pernah keluar dari server.** Jangan pernah memilih
+  kolom `password` pada query yang hasilnya dikirim ke klien.
+- Pesan gagal login sengaja sama untuk "email tidak terdaftar" dan "password
+  salah". Membedakannya memberi tahu penyerang email mana yang ada.
+
+### Analitik pengunjung
+
+- **Alamat IP tidak pernah disimpan**, tidak di kolom mana pun, tidak di log.
+  Yang disimpan hanya `sha256(ip + userAgent + garam harian)`; garamnya
+  berganti tiap hari agar sidik tidak bisa dilacak antar hari.
+- Perekaman lewat beacon dari browser (`/api/track`), bukan dari proxy -
+  tidak menambah latensi halaman, dan perayap tersaring sendiri.
+- Rollup harian dipicu dari `/api/track` dengan gerbang waktu, **tanpa cron**.
+  Pola yang sama nanti dipakai heartbeat Beregam.
+- Data simulasi wajib bertanda `isSeeded` dan **wajib dilabeli di UI**.
+  Rollup tidak pernah menimpa baris simulasi; skrip seed tidak pernah
+  menimpa baris data nyata.
+
+### Utang yang diketahui
+
+- Halaman admin memakai pola client-fetch dan semuanya ditandai aturan
+  `react-hooks/set-state-in-effect`. Pola ini sudah ada sejak awal dan
+  sesuai konvensi di atas. Membenahinya menyeluruh (mengubah halaman admin
+  jadi Server Component) layak jadi langkah tersendiri, bukan diselipkan.
+
 ### Validasi
 
 - **Satu skema Zod per domain di `src/lib/schemas/`**, diimpor bersama oleh
