@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { pengaduans } from "@/lib/db/schema";
 import * as z from "zod";
 
 const pengaduanSchema = z.object({
@@ -14,15 +16,22 @@ export async function POST(req: Request) {
     const body = await req.json();
     const validated = pengaduanSchema.parse(body);
 
-    const newPengaduan = await prisma.pengaduan.create({
-      data: {
+    const [inserted] = await db
+      .insert(pengaduans)
+      .values({
         nama: validated.nama,
         email: validated.kontak,
         kategori: validated.kategori,
         detail: validated.detail,
         status: "PENDING",
-      },
-    });
+      })
+      .$returningId();
+
+    const [newPengaduan] = await db
+      .select()
+      .from(pengaduans)
+      .where(eq(pengaduans.id, inserted.id))
+      .limit(1);
 
     return NextResponse.json(
       {
@@ -32,7 +41,7 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { success: false, errors: error.issues },

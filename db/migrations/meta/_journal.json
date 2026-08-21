@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1787285368808,
+      "tag": "0000_baseline_skema_awal",
+      "breakpoints": true
+    }
+  ]
+}

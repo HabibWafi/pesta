@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { contacts } from "@/lib/db/schema";
 import * as z from "zod";
 
 const contactSchema = z.object({
@@ -14,15 +16,24 @@ export async function POST(req: Request) {
     const body = await req.json();
     const validated = contactSchema.parse(body);
 
-    const newMessage = await prisma.contactMessage.create({
-      data: {
+    const [inserted] = await db
+      .insert(contacts)
+      .values({
         nama: validated.nama,
         email: validated.email,
         subjek: validated.subjek,
         pesan: validated.pesan,
         status: "UNREAD",
-      },
-    });
+      })
+      .$returningId();
+
+    // MySQL tidak mengembalikan baris hasil insert. Diambil ulang supaya
+    // bentuk respons tetap sama seperti sebelum migrasi ke Drizzle.
+    const [newMessage] = await db
+      .select()
+      .from(contacts)
+      .where(eq(contacts.id, inserted.id))
+      .limit(1);
 
     return NextResponse.json(
       {
@@ -32,7 +43,7 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { success: false, errors: error.issues },

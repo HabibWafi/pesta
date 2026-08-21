@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { and, desc, eq, inArray, type SQL } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { contacts } from "@/lib/db/schema";
+import { containsAny } from "@/lib/db/filters";
 import { getAdminSession } from "@/lib/auth";
 
 export async function GET(req: Request) {
@@ -13,30 +16,30 @@ export async function GET(req: Request) {
     const isReadParam = searchParams.get("isRead");
     const query = searchParams.get("q");
 
-    const where: any = {};
+    const conditions: SQL[] = [];
 
-    // Map frontend isRead filter to database status field
+    // Filter isRead dari frontend dipetakan ke kolom status di database.
     if (isReadParam === "true") {
-      where.status = { in: ["READ", "REPLIED"] };
+      conditions.push(inArray(contacts.status, ["READ", "REPLIED"]));
     } else if (isReadParam === "false") {
-      where.status = "UNREAD";
+      conditions.push(eq(contacts.status, "UNREAD"));
     }
 
-    if (query) {
-      where.OR = [
-        { nama: { contains: query } },
-        { email: { contains: query } },
-        { subjek: { contains: query } },
-        { pesan: { contains: query } },
-      ];
-    }
+    const search = containsAny(query, [
+      contacts.nama,
+      contacts.email,
+      contacts.subjek,
+      contacts.pesan,
+    ]);
+    if (search) conditions.push(search);
 
-    const items = await prisma.contactMessage.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-    });
+    const items = await db
+      .select()
+      .from(contacts)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(contacts.createdAt));
 
-    // Map database status field to frontend isRead boolean for compatibility
+    // Kolom status dipetakan balik jadi boolean isRead agar frontend tetap sama.
     const mappedItems = items.map((item) => ({
       ...item,
       isRead: item.status !== "UNREAD",
@@ -63,7 +66,8 @@ export async function PUT(req: Request) {
       return NextResponse.json({ success: false, message: "ID wajib diisi" }, { status: 400 });
     }
 
-    // Support both isRead boolean (from mark as read button) and status string (direct status update)
+    // Mendukung dua bentuk: boolean isRead (tombol "tandai dibaca") dan
+    // status string (perubahan status langsung).
     let newStatus: string;
     if (status) {
       newStatus = status;
@@ -73,10 +77,23 @@ export async function PUT(req: Request) {
       return NextResponse.json({ success: false, message: "Status atau isRead wajib diisi" }, { status: 400 });
     }
 
-    const updated = await prisma.contactMessage.update({
-      where: { id: Number(id) },
-      data: { status: newStatus },
-    });
+    const [result] = await db
+      .update(contacts)
+      .set({ status: newStatus })
+      .where(eq(contacts.id, Number(id)));
+
+    if (result.affectedRows === 0) {
+      return NextResponse.json(
+        { success: false, message: "Pesan kontak tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    const [updated] = await db
+      .select()
+      .from(contacts)
+      .where(eq(contacts.id, Number(id)))
+      .limit(1);
 
     return NextResponse.json({ success: true, message: "Status pesan berhasil diperbarui", data: updated });
   } catch (error) {
@@ -99,9 +116,14 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ success: false, message: "ID wajib diisi" }, { status: 400 });
     }
 
-    await prisma.contactMessage.delete({
-      where: { id: Number(id) },
-    });
+    const [result] = await db.delete(contacts).where(eq(contacts.id, Number(id)));
+
+    if (result.affectedRows === 0) {
+      return NextResponse.json(
+        { success: false, message: "Pesan kontak tidak ditemukan" },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ success: true, message: "Pesan kontak berhasil dihapus" });
   } catch (error) {

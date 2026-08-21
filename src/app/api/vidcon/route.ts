@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { vidconRequests } from "@/lib/db/schema";
 import * as z from "zod";
 
 const vidconSchema = z.object({
@@ -19,8 +21,9 @@ export async function POST(req: Request) {
     const body = await req.json();
     const validatedData = vidconSchema.parse(body);
 
-    const newRequest = await prisma.vidconRequest.create({
-      data: {
+    const [inserted] = await db
+      .insert(vidconRequests)
+      .values({
         nama: validatedData.nama,
         asalInstansi: validatedData.instansi,
         alamat: validatedData.alamat,
@@ -31,8 +34,14 @@ export async function POST(req: Request) {
         tanggal: validatedData.tanggal,
         jam: validatedData.jam,
         status: "PENDING",
-      },
-    });
+      })
+      .$returningId();
+
+    const [newRequest] = await db
+      .select()
+      .from(vidconRequests)
+      .where(eq(vidconRequests.id, inserted.id))
+      .limit(1);
 
     return NextResponse.json(
       {
@@ -42,7 +51,7 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { success: false, errors: error.issues },

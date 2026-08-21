@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
 import bcrypt from "bcryptjs";
 import { signAdminToken, getAdminTokenCookieName } from "@/lib/auth";
 import * as z from "zod";
@@ -14,9 +16,11 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { email, password } = loginSchema.parse(body);
 
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
 
     if (!user) {
       return NextResponse.json(
@@ -54,12 +58,12 @@ export async function POST(req: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 7 * 24 * 60 * 60, // 7 hari
       path: "/",
     });
 
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { success: false, errors: error.issues },
