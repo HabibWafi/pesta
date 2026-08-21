@@ -19,7 +19,8 @@ import {
   ChevronRight,
   Sun,
   Moon,
-  Settings2
+  Settings2,
+  BarChart3
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -102,6 +103,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Permohonan ViDCon", href: "/admin/vidcon", icon: Video },
     { name: "Pengaduan Publik", href: "/admin/pengaduan", icon: ShieldAlert },
     { name: "Pesan Kontak PST", href: "/admin/contact", icon: Mail },
+    { name: "Statistik Pengunjung", href: "/admin/analytics", icon: BarChart3 },
     { name: "Kelola Konten", href: "/admin/konten", icon: Settings2 },
   ];
 

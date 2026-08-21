@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
+import PelacakKunjungan from "@/components/PelacakKunjungan";
 import "./globals.css";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -46,6 +47,7 @@ export default function RootLayout({
       <body className={`${plusJakartaSans.className} min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-indigo-500 selection:text-white flex flex-col`}>
         {children}
         <Toaster position="top-right" richColors closeButton />
+        <PelacakKunjungan />
       </body>
     </html>
   );

@@ -7,6 +7,8 @@ import {
   text,
   datetime,
   json,
+  date,
+  index,
   unique,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
@@ -216,6 +218,68 @@ export const faqs = mysqlTable("faqs", {
   updatedAt: updatedAt(),
 });
 
+
+// ---------------------------------------------------------------------------
+// 8. Analitik pengunjung - data mentah
+//
+// Self-hosted di MySQL sendiri, bukan layanan pihak ketiga. Alasannya sama
+// dengan alasan Beregam menaruh engine di kantor: data pelayanan publik
+// instansi tidak perlu keluar, dan tidak ada ketergantungan pada pihak lain.
+//
+// ALAMAT IP TIDAK PERNAH DISIMPAN. Yang disimpan hanya visitorHash, yaitu
+// sha256(ip + userAgent + garam harian). Garamnya berganti tiap hari,
+// sehingga hash yang sama tidak bisa dilacak lintas hari. Cukup untuk
+// menghitung pengunjung unik, tidak cukup untuk mengenali orangnya.
+//
+// Retensi 90 hari; ringkasannya sudah aman di analytics_daily.
+// ---------------------------------------------------------------------------
+export const analyticsEvents = mysqlTable(
+  "analytics_events",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    path: varchar("path", { length: 190 }).notNull(),
+    referrer: varchar("referrer", { length: 190 }),
+    /** sha256(ip + userAgent + garam harian) - bukan identitas. */
+    visitorHash: varchar("visitor_hash", { length: 64 }).notNull(),
+    /** desktop | mobile | tablet */
+    device: varchar("device", { length: 20 }).notNull(),
+    browser: varchar("browser", { length: 30 }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("analytics_events_created_idx").on(t.createdAt),
+    index("analytics_events_hash_idx").on(t.visitorHash),
+  ]
+);
+
+// ---------------------------------------------------------------------------
+// 9. Analitik pengunjung - rollup harian
+//
+// Disimpan selamanya. Dipisah dari data mentah supaya baris mentah bisa
+// dihapus setelah 90 hari tanpa kehilangan riwayat.
+// ---------------------------------------------------------------------------
+export const analyticsDaily = mysqlTable(
+  "analytics_daily",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tanggal: date("tanggal", { mode: "string" }).notNull(),
+    views: int("views").default(0).notNull(),
+    uniqueVisitors: int("unique_visitors").default(0).notNull(),
+    /**
+     * PENANDA DATA SIMULASI.
+     *
+     * Ini instansi statistik. Angka karangan yang tidak bisa dibedakan dari
+     * angka nyata adalah masalah institusional, bukan sekadar masalah
+     * teknis. Setiap baris hasil skrip dummy WAJIB bertanda true, dan UI
+     * WAJIB melabelinya.
+     */
+    isSeeded: boolean("is_seeded").default(false).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [unique("analytics_daily_tanggal_key").on(t.tanggal)]
+);
+
 // ---------------------------------------------------------------------------
 // Tipe turunan - pakai ini di komponen dan route, jangan `any`.
 // ---------------------------------------------------------------------------
@@ -236,3 +300,6 @@ export type Testimonial = InferSelectModel<typeof testimonials>;
 export type NewTestimonial = InferInsertModel<typeof testimonials>;
 export type Faq = InferSelectModel<typeof faqs>;
 export type NewFaq = InferInsertModel<typeof faqs>;
+
+export type AnalyticsEvent = InferSelectModel<typeof analyticsEvents>;
+export type AnalyticsDaily = InferSelectModel<typeof analyticsDaily>;
