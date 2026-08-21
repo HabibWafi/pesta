@@ -1,0 +1,246 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 240 10% 98%;
+    --foreground: 222.2 84% 4.9%;
+    --primary: 238.7 83.5% 66.7%;
+    --primary-foreground: 210 40% 98%;
+    --bps-navy: 222.2 47.4% 11.2%;
+    --bps-cyan: 199 89% 48%;
+    --bps-emerald: 160 84% 39%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --border: 214.3 31.8% 91.4%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #f8fafc;
+  color: #0f172a;
+  overflow-x: hidden;
+}
+
+/* ==========================================================================
+   HIGH-CONTRAST DARK MODE STYLING SYSTEM
+   ========================================================================== */
+html.dark body {
+  background-color: #030712;
+  color: #f8fafc;
+}
+
+html.dark .bg-white {
+  background-color: #0b1329 !important;
+  color: #f8fafc !important;
+  border-color: #1e293b !important;
+}
+
+html.dark .bg-slate-50, 
+html.dark .bg-slate-50\/50,
+html.dark .bg-slate-50\/80 {
+  background-color: #111c38 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .text-slate-900 {
+  color: #ffffff !important;
+}
+
+html.dark .text-slate-800 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+html.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* Datatable Headers & Rows in Dark Mode */
+html.dark table thead {
+  background-color: #0f172a !important;
+  border-bottom-color: #1e293b !important;
+}
+
+html.dark table thead th {
+  color: #f8fafc !important;
+}
+
+html.dark table tbody tr {
+  border-bottom-color: #1e293b !important;
+}
+
+html.dark table tbody tr:hover {
+  background-color: #1a2744 !important;
+}
+
+/* Pagination Footer Text & Buttons in Dark Mode */
+html.dark .border-t {
+  border-color: #1e293b !important;
+}
+
+html.dark button:disabled {
+  opacity: 0.35 !important;
+}
+
+/* Forms, Inputs & Selects in Dark Mode */
+html.dark input, 
+html.dark select, 
+html.dark textarea {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+html.dark select option {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+/* Glassmorphism utility */
+.glass-header {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05);
+}
+
+.glass-card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -15px rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+/* Gradient Text Effect */
+.gradient-text-bps {
+  background: linear-gradient(135deg, #1e293b 0%, #4f46e5 50%, #0284c7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-accent {
+  background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glowing Accent Blob */
+.glow-blob {
+  position: absolute;
+  filter: blur(80px);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+html.dark ::-webkit-scrollbar-track {
+  background: #030712;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ==========================================================================
+   ACCESSIBILITY & INCLUSIVITY STYLING SYSTEM (WCAG 2.1 AAA)
+   ========================================================================== */
+
+/* 1. Text Scaling Modes */
+html.text-scale-large {
+  font-size: 115%;
+}
+
+html.text-scale-xlarge {
+  font-size: 130%;
+}
+
+/* 2. High Contrast Yellow-Black Mode for Elderly & Visually Impaired */
+html.high-contrast-mode body {
+  background-color: #000000 !important;
+  color: #ffff00 !important;
+}
+
+html.high-contrast-mode * {
+  background-color: #000000 !important;
+  color: #ffff00 !important;
+  border-color: #ffff00 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html.high-contrast-mode button,
+html.high-contrast-mode a {
+  background-color: #ffff00 !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+  text-decoration: underline !important;
+}
+
+html.high-contrast-mode input,
+html.high-contrast-mode select,
+html.high-contrast-mode textarea {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border: 3px solid #ffff00 !important;
+}
+
+/* 3. Accessible Font & Spacing Mode */
+html.accessible-font-mode * {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
+  line-height: 1.8 !important;
+  letter-spacing: 0.04em !important;
+}
+

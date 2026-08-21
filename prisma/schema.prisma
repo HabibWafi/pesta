@@ -1,0 +1,73 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Tabel Pengguna / Administrator BPS
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(255)
+  email     String   @unique @db.VarChar(255)
+  password  String   @db.VarChar(255) // Hashed with bcrypt
+  role      String   @default("ADMIN") @db.VarChar(50) // ADMIN, SUPERADMIN
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+// 2. Tabel Permohonan ViDCon (Virtual Data Consultation)
+model VidconRequest {
+  id           Int      @id @default(autoincrement())
+  nama         String   @db.VarChar(255)
+  asalInstansi String   @map("asal_instansi") @db.VarChar(255)
+  alamat       String   @db.Text
+  noHp         String   @map("no_hp") @db.VarChar(50)
+  email        String   @db.VarChar(255)
+  cakupan      String   @db.VarChar(255) // Data Perekonomian, Inflasi, Metodologi, dll.
+  deskripsi    String   @db.Text
+  tanggal      String   @db.VarChar(20)  // YYYY-MM-DD
+  jam          String   @db.VarChar(10)  // HH:mm
+  status       String   @default("PENDING") @db.VarChar(20) // PENDING, APPROVED, REJECTED, COMPLETED
+  catatanAdmin String?  @map("catatan_admin") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("vidcon_requests")
+}
+
+// 3. Tabel Pengaduan Publik (Kanal Internal PESTA)
+model Pengaduan {
+  id           Int      @id @default(autoincrement())
+  nama         String   @db.VarChar(255) // Nama atau 'Anonim'
+  jenisKelamin String?  @map("jenis_kelamin") @db.VarChar(20) // Laki-laki / Perempuan
+  noHp         String?  @map("no_hp") @db.VarChar(50)
+  email        String   @db.VarChar(255)
+  asalInstansi String?  @map("asal_instansi") @db.VarChar(255)
+  kategori     String   @db.VarChar(100) // Pelayanan PST, ViDCon, Publikasi, Sarpras, dll.
+  detail       String   @db.Text
+  status       String   @default("PENDING") @db.VarChar(20) // PENDING, IN_PROGRESS, RESOLVED
+  tanggapan    String?  @db.Text // Balasan / tindak lanjut staf BPS
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("pengaduans")
+}
+
+// 4. Tabel Pesan Kontak Cepat
+model ContactMessage {
+  id        Int      @id @default(autoincrement())
+  nama      String   @db.VarChar(255)
+  email     String   @db.VarChar(255)
+  subjek    String   @db.VarChar(255)
+  pesan     String   @db.Text
+  status    String   @default("UNREAD") @db.VarChar(20) // UNREAD, READ, REPLIED
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("contacts")
+}

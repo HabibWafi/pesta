@@ -1,0 +1,17 @@
+# Normalisasi akhir baris supaya diff tidak berisik antar sistem.
+* text=auto eol=lf
+
+# Berkas biner — jangan diutak-atik.
+*.png  binary
+*.ico  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+
+# Dump SQL besar: sembunyikan dari diff, tandai sebagai data.
+*.sql linguist-generated=true
+package-lock.json linguist-generated=true
