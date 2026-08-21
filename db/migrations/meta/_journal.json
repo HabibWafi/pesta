@@ -36,6 +36,13 @@
       "when": 1787289213381,
       "tag": "0004_analitik_per_halaman",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1787293251777,
+      "tag": "0005_beregam_fondasi",
+      "breakpoints": true
     }
   ]
 }

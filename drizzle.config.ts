@@ -15,7 +15,7 @@ import type { Config } from "drizzle-kit";
  * ketidaknyamanan menyalin SQL.
  */
 export default {
-  schema: "./src/lib/db/schema.ts",
+  schema: ["./src/lib/db/schema.ts", "./src/lib/beregam/db/schema.ts"],
   out: "./db/migrations",
   dialect: "mysql",
   dbCredentials: {
