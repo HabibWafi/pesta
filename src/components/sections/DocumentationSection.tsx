@@ -1,41 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Camera, Star, Quote, CheckCircle2, UserCheck } from "lucide-react";
+import { Star, Quote, UserCheck } from "lucide-react";
+import type { Testimonial } from "@/lib/db/schema";
 
-interface Testimonial {
-  nama: string;
-  peran: string;
-  instansi: string;
-  pesan: string;
-  rating: number;
+interface DocumentationSectionProps {
+  testimoni: Testimonial[];
 }
 
-const testimonials: Testimonial[] = [
-  {
-    nama: "H. Supriyadi, M.Si",
-    peran: "Kepala Bidang Perencanaan",
-    instansi: "Bappeda Musi Rawas",
-    pesan: "Layanan ViDCon PESTA BPS Musi Rawas sangat membantu kami dalam koordinasi penyusunan data indikator makro PDRB dan kemiskinan daerah tanpa perlu datang langsung. Responnya sangat cepat!",
-    rating: 5,
-  },
-  {
-    nama: "Rina Kartika",
-    peran: "Mahasiswa Tingkat Akhir",
-    instansi: "Universitas Musi Rawas",
-    pesan: "Sangat dimudahkan saat minta konsultasi metodologi survei untuk skripsi saya. Staf BPS memberikan penjelasan yang ramah, jelas, dan 100% gratis (Layanan Nol Rupiah).",
-    rating: 5,
-  },
-  {
-    nama: "Budi Santoso, S.ST",
-    peran: "Peneliti Ekonomi Daerah",
-    instansi: "Lembaga Riset Publik",
-    pesan: "Portal PESTA versi baru ini tampilannya jauh lebih keren, modern, dan gampang dipakai di HP. Rekomendasi statistik ROMANTIK dan data mikronya mudah diakses.",
-    rating: 5,
-  },
-];
-
-export default function DocumentationSection() {
+export default function DocumentationSection({ testimoni }: DocumentationSectionProps) {
   return (
     <section id="dokumentasi" className="py-24 bg-white relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -55,7 +28,7 @@ export default function DocumentationSection() {
 
         {/* Testimonials Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {testimonials.map((item, index) => (
+          {testimoni.map((item, index) => (
             <motion.div
               key={index}
               whileHover={{ y: -4 }}

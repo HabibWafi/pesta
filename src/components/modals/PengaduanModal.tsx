@@ -25,9 +25,15 @@ import { motion, AnimatePresence } from "framer-motion";
 interface PengaduanModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Label istilah dari site_settings, bisa diubah lewat /admin/konten. */
+  istilah?: { tab: string; sukses: string };
 }
 
-export default function PengaduanModal({ isOpen, onClose }: PengaduanModalProps) {
+export default function PengaduanModal({
+  isOpen,
+  onClose,
+  istilah = { tab: "Form Aduan", sukses: "Aduan Berhasil Terkirim!" },
+}: PengaduanModalProps) {
   const [activeTab, setActiveTab] = useState<"mandiri" | "lapor" | "wbs">("mandiri");
 
   const {
@@ -49,16 +55,16 @@ export default function PengaduanModal({ isOpen, onClose }: PengaduanModalProps)
 
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.message || "Gagal mengirim pengaduan");
+        throw new Error(json.message || "Gagal mengirim aduan");
       }
 
-      toast.success("Pengaduan Mandiri Berhasil Terkirim!", {
+      toast.success(istilah.sukses, {
         description: `Laporan Anda telah diteruskan ke Staf Pengawas BPS Musi Rawas. Kerahasiaan identitas Anda terjamin.`,
       });
       reset();
       onClose();
     } catch (err: any) {
-      toast.error("Gagal Mengirim Pengaduan", {
+      toast.error("Gagal Mengirim Aduan", {
         description: err.message || "Terjadi kendala jaringan.",
       });
     }
@@ -114,7 +120,7 @@ export default function PengaduanModal({ isOpen, onClose }: PengaduanModalProps)
               }`}
             >
               <FileCheck className="w-3.5 h-3.5 shrink-0" />
-              <span>Form PESTA</span>
+              <span>{istilah.tab}</span>
             </button>
 
             <button
@@ -142,11 +148,11 @@ export default function PengaduanModal({ isOpen, onClose }: PengaduanModalProps)
             </button>
           </div>
 
-          {/* TAB 1: FORM PENGADUAN MANDIRI PESTA */}
+          {/* TAB 1: FORM ADUAN INTERNAL */}
           {activeTab === "mandiri" && (
             <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-xs text-amber-900 leading-relaxed">
-                Formulir pengaduan internal langsung yang akan ditindaklanjuti oleh Staf Pengawas BPS Kabupaten Musi Rawas.
+                Formulir aduan internal yang langsung ditindaklanjuti oleh Staf Pengawas BPS Kabupaten Musi Rawas.
               </div>
 
               <div>
@@ -235,7 +241,7 @@ export default function PengaduanModal({ isOpen, onClose }: PengaduanModalProps)
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kategori Pengaduan *
+                  Kategori Aduan *
                 </label>
                 <select
                   {...register("kategori")}
@@ -255,7 +261,7 @@ export default function PengaduanModal({ isOpen, onClose }: PengaduanModalProps)
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-amber-600" /> Uraian Pengaduan / Masukan *
+                  <FileText className="w-3.5 h-3.5 text-amber-600" /> Uraian Aduan / Masukan *
                 </label>
                 <textarea
                   {...register("detail")}

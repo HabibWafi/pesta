@@ -1,4 +1,14 @@
-import { mysqlTable, int, varchar, text, datetime, json, unique } from "drizzle-orm/mysql-core";
+import {
+  mysqlTable,
+  int,
+  tinyint,
+  boolean,
+  varchar,
+  text,
+  datetime,
+  json,
+  unique,
+} from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
 
@@ -137,6 +147,75 @@ export const contacts = mysqlTable("contacts", {
   updatedAt: updatedAt(),
 });
 
+
+// ---------------------------------------------------------------------------
+// 5. Pengaturan situs (key/value)
+//
+// Menampung isi yang berubah-ubah: alamat kantor, telepon, jam layanan,
+// koordinat peta, saklar tampil tiap bagian landing, dan label istilah.
+// Tujuannya satu: konten yang berubah-ubah tidak boleh butuh deploy.
+// ---------------------------------------------------------------------------
+export const siteSettings = mysqlTable(
+  "site_settings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** Kunci pengaturan, mis. "kontak.alamat" atau "peta.lat" */
+    key: varchar("setting_key", { length: 80 }).notNull(),
+    value: text("setting_value"),
+    /** Pengelompokan untuk tampilan admin: kontak | peta | tampilan | istilah */
+    grup: varchar("grup", { length: 40 }).default("umum").notNull(),
+    /** Siapa yang terakhir mengubah - berguna saat menelusuri perubahan. */
+    updatedBy: int("updated_by"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [unique("site_settings_key_key").on(t.key)]
+);
+
+// ---------------------------------------------------------------------------
+// 6. Testimoni pengguna layanan
+//
+// Ditampilkan di landing hanya bila isPublished true DAN saklar bagian
+// testimoni dinyalakan lewat site_settings.
+// ---------------------------------------------------------------------------
+export const testimonials = mysqlTable("testimonials", {
+  id: int("id").autoincrement().primaryKey(),
+  nama: varchar("nama", { length: 150 }).notNull(),
+  peran: varchar("peran", { length: 150 }),
+  instansi: varchar("instansi", { length: 150 }),
+  pesan: text("pesan").notNull(),
+  rating: tinyint("rating").default(5).notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  isPublished: boolean("is_published").default(false).notNull(),
+  /**
+   * Dari mana testimoni ini berasal - surat, wawancara, formulir kepuasan.
+   *
+   * Wajib diisi sebelum ditayangkan. Ini situs resmi instansi pemerintah;
+   * pujian yang mengatasnamakan orang dan lembaga tertentu harus bisa
+   * ditelusuri keasliannya, bukan sekadar enak dibaca.
+   */
+  sourceNote: text("source_note"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+// ---------------------------------------------------------------------------
+// 7. FAQ website
+//
+// Terpisah dari beregam_faq (menu bot WhatsApp) yang dibuat nanti. Isinya
+// bisa mirip, tapi audiens dan bentuk tampilannya berbeda.
+// ---------------------------------------------------------------------------
+export const faqs = mysqlTable("faqs", {
+  id: int("id").autoincrement().primaryKey(),
+  pertanyaan: varchar("pertanyaan", { length: 255 }).notNull(),
+  jawaban: text("jawaban").notNull(),
+  kategori: varchar("kategori", { length: 60 }),
+  sortOrder: int("sort_order").default(0).notNull(),
+  isPublished: boolean("is_published").default(true).notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
 // ---------------------------------------------------------------------------
 // Tipe turunan - pakai ini di komponen dan route, jangan `any`.
 // ---------------------------------------------------------------------------
@@ -151,3 +230,9 @@ export type NewPengaduan = InferInsertModel<typeof pengaduans>;
 
 export type ContactMessage = InferSelectModel<typeof contacts>;
 export type NewContactMessage = InferInsertModel<typeof contacts>;
+
+export type SiteSetting = InferSelectModel<typeof siteSettings>;
+export type Testimonial = InferSelectModel<typeof testimonials>;
+export type NewTestimonial = InferInsertModel<typeof testimonials>;
+export type Faq = InferSelectModel<typeof faqs>;
+export type NewFaq = InferInsertModel<typeof faqs>;

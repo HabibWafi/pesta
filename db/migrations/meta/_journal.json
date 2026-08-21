@@ -15,6 +15,13 @@
       "when": 1787285899499,
       "tag": "0001_layanan_inklusif",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787286357507,
+      "tag": "0002_konten_landing",
+      "breakpoints": true
     }
   ]
 }

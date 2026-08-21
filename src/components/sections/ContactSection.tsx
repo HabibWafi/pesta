@@ -2,8 +2,10 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { toast } from "sonner";
+import { contactSchema, type ContactFormData } from "@/lib/schemas/contact";
+import PetaLokasi from "@/components/ui/PetaLokasi";
+import type { Pengaturan } from "@/lib/content";
 import { 
   Send, 
   MapPin, 
@@ -17,20 +19,19 @@ import {
   ArrowRight
 } from "lucide-react";
 
-const contactSchema = z.object({
-  nama: z.string().min(2, "Nama minimal 2 karakter"),
-  email: z.string().email("Format email tidak valid"),
-  subjek: z.string().min(3, "Subjek minimal 3 karakter"),
-  pesan: z.string().min(10, "Pesan minimal 10 karakter"),
-});
-
-type ContactFormData = z.infer<typeof contactSchema>;
-
 interface ContactSectionProps {
   onOpenPengaduan?: () => void;
+  pengaturan: Pengaturan;
+  tampilPeta: boolean;
+  googleMapsKey: string;
 }
 
-export default function ContactSection({ onOpenPengaduan }: ContactSectionProps) {
+export default function ContactSection({
+  onOpenPengaduan,
+  pengaturan,
+  tampilPeta,
+  googleMapsKey,
+}: ContactSectionProps) {
   const {
     register,
     handleSubmit,
@@ -82,19 +83,19 @@ export default function ContactSection({ onOpenPengaduan }: ContactSectionProps)
 
         {/* 3 Official Complaint Channels Information Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-          {/* Channel 1: Form PESTA */}
+          {/* Kanal 1: Form Aduan internal PESTA */}
           <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200/90 flex flex-col justify-between space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="p-2.5 rounded-xl bg-amber-100 text-amber-700 font-bold text-xs flex items-center gap-2">
                   <ShieldAlert className="w-4 h-4" />
-                  Form Mandiri PESTA
+                  {pengaturan["istilah.aduan_kartu"]}
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                   Internal BPS
                 </span>
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Pengaduan Internal Musi Rawas</h4>
+              <h4 className="font-bold text-slate-900 text-sm">{pengaturan["istilah.aduan_judul"]}</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Laporan langsung yang ditindaklanjuti oleh Staf Pengawas BPS Kabupaten Musi Rawas secara rahasia.
               </p>
@@ -104,7 +105,7 @@ export default function ContactSection({ onOpenPengaduan }: ContactSectionProps)
               onClick={onOpenPengaduan}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-700 pt-1 text-left"
             >
-              <span>Buat Laporan Mandiri</span>
+              <span>{pengaturan["istilah.aduan_tombol"]}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -182,9 +183,7 @@ export default function ContactSection({ onOpenPengaduan }: ContactSectionProps)
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900">Alamat Kantor</h4>
-                  <p className="text-slate-600 mt-0.5">
-                    Jl. Pangeran Mohammad Amin, Komplek Perkantoran Agropolitan Muara Beliti, Musi Rawas, Sumatera Selatan
-                  </p>
+                  <p className="text-slate-600 mt-0.5">{pengaturan["kontak.alamat"]}</p>
                 </div>
               </div>
 
@@ -194,7 +193,7 @@ export default function ContactSection({ onOpenPengaduan }: ContactSectionProps)
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900">Email Resmi</h4>
-                  <p className="text-slate-600">bps1605@bps.go.id</p>
+                  <p className="text-slate-600">{pengaturan["kontak.email"]}</p>
                 </div>
               </div>
 
@@ -204,7 +203,7 @@ export default function ContactSection({ onOpenPengaduan }: ContactSectionProps)
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900">Telepon Kantor</h4>
-                  <p className="text-slate-600">(0733) 4540056</p>
+                  <p className="text-slate-600">{pengaturan["kontak.telepon"]}</p>
                 </div>
               </div>
 
@@ -214,9 +213,20 @@ export default function ContactSection({ onOpenPengaduan }: ContactSectionProps)
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900">Jam Layanan PST</h4>
-                  <p className="text-slate-600">Senin - Jumat: 08.00 - 15.00 WIB</p>
+                  <p className="text-slate-600 whitespace-pre-line">{pengaturan["kontak.jam_layanan"]}</p>
                 </div>
               </div>
+
+              {tampilPeta && (
+                <PetaLokasi
+                  lat={pengaturan["peta.lat"]}
+                  lng={pengaturan["peta.lng"]}
+                  zoom={pengaturan["peta.zoom"]}
+                  judul={pengaturan["peta.judul"]}
+                  jenis={pengaturan["peta.jenis"]}
+                  googleKey={googleMapsKey}
+                />
+              )}
             </div>
           </div>
 

@@ -3,36 +3,13 @@
 import { useState } from "react";
 import { ChevronDown, HelpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import type { Faq } from "@/lib/db/schema";
 
-interface FaqItem {
-  question: string;
-  answer: string;
+interface FaqSectionProps {
+  faq: Faq[];
 }
 
-const faqs: FaqItem[] = [
-  {
-    question: "Apakah layanan ViDCon (Virtual Consultation) ini berbayar?",
-    answer: "Tidak. Seluruh layanan ViDCon merupakan bagian dari komitmen Layanan Nol Rupiah BPS Kabupaten Musi Rawas dan diberikan secara 100% GRATIS kepada seluruh pengguna data dan stakeholder.",
-  },
-  {
-    question: "Apakah layanan ViDCon dapat diakses di luar jam kerja?",
-    answer: "Permohonan pendaftaran jadwal ViDCon dapat diajukan kapan saja secara online (24/7). Namun, pelaksanaan sesi ViDCon bersama staf BPS berlangsung pada jam kerja resmi (Senin-Jumat, pukul 08.00 - 15.00 WIB).",
-  },
-  {
-    question: "Apa saja topik yang dapat dikonsultasikan melalui ViDCon?",
-    answer: "Pengguna data dapat mengkonsultasikan berbagai topik statistik, antara lain: rilis indikator makro (sosial, ekonomi, kependudukan, inflasi), penjelasan konsep & definisi variabel, rekomendasi statistik sektoral, metodologi sensus/survei, serta bimbingan tugas akhir/penelitian mahasiswa.",
-  },
-  {
-    question: "Apakah layanan ViDCon khusus untuk instansi pemerintah saja?",
-    answer: "Tidak. Layanan ViDCon terbuka luas untuk umum, termasuk OPD/instansi pemerintah, akademisi, mahasiswa, peneliti, pelaku usaha, wartawan, dan seluruh lapisan masyarakat.",
-  },
-  {
-    question: "Berapa lama konfirmasi jadwal ViDCon diberikan?",
-    answer: "Tim petugas BPS Kabupaten Musi Rawas akan melakukan verifikasi dan mengirimkan konfirmasi link Google Meet/Zoom via Email / WhatsApp maksimal 1x24 jam pada hari kerja.",
-  },
-];
-
-export default function FaqSection() {
+export default function FaqSection({ faq }: FaqSectionProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   const toggleFaq = (index: number) => {
@@ -57,11 +34,11 @@ export default function FaqSection() {
 
         {/* FAQ Accordion List */}
         <div className="space-y-4">
-          {faqs.map((faq, index) => {
+          {faq.map((item, index) => {
             const isOpen = openIndex === index;
             return (
               <div
-                key={index}
+                key={item.id}
                 className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
                   isOpen
                     ? "bg-white border-indigo-200 shadow-md shadow-indigo-500/5"
@@ -73,7 +50,7 @@ export default function FaqSection() {
                   className="w-full flex items-center justify-between p-6 text-left focus:outline-none"
                 >
                   <span className="font-bold text-slate-900 text-base sm:text-lg pr-4">
-                    {faq.question}
+                    {item.pertanyaan}
                   </span>
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300 ${
@@ -93,7 +70,7 @@ export default function FaqSection() {
                       transition={{ duration: 0.3 }}
                     >
                       <div className="px-6 pb-6 text-slate-600 text-sm leading-relaxed border-t border-slate-100 pt-4">
-                        {faq.answer}
+                        {item.jawaban}
                       </div>
                     </motion.div>
                   )}
