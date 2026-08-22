@@ -21,6 +21,20 @@
  * Next menyisipkan sidik isi berkas ke URL-nya, sehingga aman di-cache
  * selamanya dan otomatis berganti URL ketika logonya diganti.
  *
+ * HANYA LAMBANG, BUKAN LOGO LENGKAP
+ *
+ * Logo sumber adalah lambang (orang + grafik + gelembung bicara) DIIKUTI
+ * wordmark "PeSTa" dan tagline di bawahnya, disusun vertikal dalam satu
+ * kanvas persegi. Me-resize seluruh kanvas ke 32px membuat wordmark-nya
+ * mengecil sampai tidak terbaca sama sekali - favicon di bilah tab jauh
+ * lebih kecil daripada ikon aplikasi, dan nyaris setiap situs sengaja
+ * memakai lambang saja untuk ukuran sekecil itu, bukan logo penuh.
+ *
+ * TINGGI_LAMBANG di bawah adalah perkiraan proporsi tinggi lambang
+ * terhadap tinggi kanvas PADA LOGO SAAT INI - sesuaikan kalau logo sumber
+ * diganti dengan tata letak yang berbeda (mis. wordmark di samping,
+ * bukan di bawah).
+ *
  * Jalankan ulang setiap kali logo sumber berubah.
  */
 
@@ -36,6 +50,9 @@ const UKURAN = [
   { nama: "icon.png", sisi: 32 },
   { nama: "apple-icon.png", sisi: 180 },
 ];
+
+/** Proporsi tinggi lambang terhadap tinggi kanvas penuh - lihat catatan di atas. */
+const TINGGI_LAMBANG = 0.6;
 
 let sharp;
 try {
@@ -60,8 +77,19 @@ console.log(`Sumber: ${asal.width}x${asal.height} ${asal.format}`);
 
 await mkdir(tujuanDir, { recursive: true });
 
+// Potong bagian atas kanvas (lambang saja, tanpa wordmark), lalu pangkas
+// sisa latar putih di sekelilingnya supaya lambangnya memenuhi kanvas
+// ikon - bukan mengambang kecil di tengah kotak kosong.
+const tinggiPotong = Math.round((asal.height ?? 0) * TINGGI_LAMBANG);
+const potonganAtas = await sharp(sumber)
+  .extract({ left: 0, top: 0, width: asal.width, height: tinggiPotong })
+  .toBuffer();
+const lambang = await sharp(potonganAtas)
+  .trim({ background: "#ffffff", threshold: 8 })
+  .toBuffer();
+
 for (const { nama, sisi } of UKURAN) {
-  const isi = await sharp(sumber)
+  const isi = await sharp(lambang)
     .resize(sisi, sisi, {
       fit: "contain",
       // Latar transparan, bukan putih: favicon tampil di atas bilah tab
