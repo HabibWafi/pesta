@@ -1,309 +1,678 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { 
-  Volume2, 
-  VolumeX, 
-  Eye, 
-  Type, 
-  Sun, 
-  Moon, 
-  Sparkles, 
-  X, 
-  Accessibility, 
-  Check, 
-  HelpCircle,
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Accessibility,
+  AlignJustify,
+  Ban,
+  Bold,
+  Contrast,
   Ear,
-  ShieldCheck
+  Eye,
+  EyeOff,
+  Focus,
+  Image as ImageIcon,
+  Info,
+  ListTree,
+  Minus,
+  MousePointer2,
+  Move3d,
+  PauseCircle,
+  Plus,
+  RotateCcw,
+  Square,
+  SunMoon,
+  Type,
+  Volume2,
+  VolumeX,
+  X,
+  Link2,
+  Heading,
+  BookOpen,
 } from "lucide-react";
-import { toast } from "sonner";
+import {
+  BAWAAN,
+  PROFIL,
+  baca,
+  simpan,
+  terapkan,
+  type KunciProfil,
+  type ModeWarna,
+  type Pengaturan,
+} from "@/lib/aksesibilitas";
+
+/**
+ * Panel mode aksesibilitas inklusif.
+ *
+ * Menggantikan versi lama yang hanya punya empat penyesuaian, dan tiga di
+ * antaranya tidak benar-benar bekerja: pengaturannya hilang setiap pindah
+ * halaman, pembaca suaranya membacakan satu paragraf promosi yang ditulis
+ * tetap di kode alih-alih isi halaman, dan mode kontras tingginya memakai
+ * `* !important` yang membuat logo serta seluruh ikon menghilang.
+ *
+ * Ketiganya diperbaiki di sini dan di src/lib/aksesibilitas.ts.
+ */
+
+interface StrukturHalaman {
+  taraf: number;
+  teks: string;
+  id: string;
+}
 
 export default function AccessibilityWidget() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [textSize, setTextSize] = useState<"normal" | "large" | "xlarge">("normal");
-  const [highContrast, setHighContrast] = useState(false);
-  const [readableFont, setReadableFont] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
+  const [terbuka, setTerbuka] = useState(false);
+  /**
+   * Dibaca saat state pertama kali dibuat, bukan lewat useEffect.
+   *
+   * Aman karena komponen ini dimuat dengan `ssr: false` - tidak pernah
+   * dirender di server, jadi tidak ada hasil server yang bisa berbeda dari
+   * hasil peramban. Lewat useEffect justru menambah satu render tambahan
+   * tanpa manfaat apa pun di sini.
+   */
+  const [p, setP] = useState<Pengaturan>(() =>
+    typeof window === "undefined" ? BAWAAN : baca()
+  );
+  const [membaca, setMembaca] = useState(false);
+  const [struktur, setStruktur] = useState<StrukturHalaman[] | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const pemicuRef = useRef<HTMLButtonElement>(null);
 
-  // Apply CSS classes dynamically to <html> tag
+  // Skrip inline di layout sudah menerapkan pengaturan tersimpan sebelum
+  // render pertama, jadi tidak ada kedipan di sini - efek ini yang menjaga
+  // DOM tetap selaras setiap kali pengunjung mengubah sesuatu.
   useEffect(() => {
-    const htmlEl = document.documentElement;
+    terapkan(p);
+    simpan(p);
+  }, [p]);
 
-    // Text Size
-    htmlEl.classList.remove("text-scale-large", "text-scale-xlarge");
-    if (textSize === "large") htmlEl.classList.add("text-scale-large");
-    if (textSize === "xlarge") htmlEl.classList.add("text-scale-xlarge");
+  // --- penunjuk baca: garis yang mengikuti kursor --------------------------
+  useEffect(() => {
+    if (!p.penunjukBaca) return;
 
-    // High Contrast
-    if (highContrast) {
-      htmlEl.classList.add("high-contrast-mode");
-    } else {
-      htmlEl.classList.remove("high-contrast-mode");
+    const garis = document.createElement("div");
+    garis.className = "a11y-penunjuk-baca";
+    garis.setAttribute("aria-hidden", "true");
+    document.body.appendChild(garis);
+
+    const gerak = (e: MouseEvent) => {
+      garis.style.top = `${e.clientY}px`;
+    };
+    window.addEventListener("mousemove", gerak);
+
+    return () => {
+      window.removeEventListener("mousemove", gerak);
+      garis.remove();
+    };
+  }, [p.penunjukBaca]);
+
+  // --- tooltip teks alternatif gambar --------------------------------------
+  //
+  // Menyalin alt ke title supaya muncul saat kursor berhenti di atas gambar.
+  // Nilai title asli disimpan agar bisa dikembalikan saat saklarnya dimatikan.
+  useEffect(() => {
+    if (!p.tooltipGambar) return;
+
+    const gambar = Array.from(document.querySelectorAll<HTMLImageElement>("img[alt]"));
+    const semula = new Map<HTMLImageElement, string | null>();
+
+    for (const g of gambar) {
+      if (!g.alt.trim()) continue;
+      semula.set(g, g.getAttribute("title"));
+      g.setAttribute("title", g.alt);
     }
 
-    // Readable Font
-    if (readableFont) {
-      htmlEl.classList.add("accessible-font-mode");
-    } else {
-      htmlEl.classList.remove("accessible-font-mode");
-    }
-  }, [textSize, highContrast, readableFont]);
+    return () => {
+      for (const [g, judul] of semula) {
+        if (judul === null) g.removeAttribute("title");
+        else g.setAttribute("title", judul);
+      }
+    };
+  }, [p.tooltipGambar]);
 
-  // Voice Reader (SpeechSynthesis API)
-  const toggleSpeech = () => {
-    if (speaking) {
-      window.speechSynthesis?.cancel();
-      setSpeaking(false);
-      toast.info("Suara pembaca dihentikan");
+  // --- Escape menutup panel, fokus dikembalikan ke tombol pemicu -----------
+  useEffect(() => {
+    if (!terbuka) return;
+
+    const padaTombol = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setTerbuka(false);
+        pemicuRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", padaTombol);
+    return () => window.removeEventListener("keydown", padaTombol);
+  }, [terbuka]);
+
+  // --- pembaca layar -------------------------------------------------------
+  const hentikanBaca = useCallback(() => {
+    window.speechSynthesis?.cancel();
+    setMembaca(false);
+  }, []);
+
+  useEffect(() => () => window.speechSynthesis?.cancel(), []);
+
+  /**
+   * Membacakan ISI HALAMAN yang sedang dibuka.
+   *
+   * Versi lama membacakan satu paragraf promosi yang ditulis tetap di kode -
+   * diberi label "pembaca untuk tuna netra", padahal pengunjung tuna netra
+   * sama sekali tidak bisa mendengar isi halamannya.
+   */
+  const bacakanHalaman = () => {
+    if (membaca) {
+      hentikanBaca();
       return;
     }
 
     if (!("speechSynthesis" in window)) {
-      toast.error("Browser tidak mendukung pembaca suara");
+      alert("Peramban ini belum mendukung pembaca suara.");
       return;
     }
 
+    const utama = document.querySelector("main") ?? document.body;
+    const teks = (utama as HTMLElement).innerText.replace(/\s+/g, " ").trim();
+
+    if (!teks) return;
+
     window.speechSynthesis.cancel();
 
-    const mainText = `Selamat datang di Portal Pelayanan Statistik Digital PESTA BPS Kabupaten Musi Rawas. Portal ini dirancang ramah untuk semua warga, termasuk lansia, penyandang tuna rungu, dan penyandang disabilitas. Anda dapat mendaftar Konsultasi Virtual ViDCon, mengajukan pertanyaan data, atau meminta pendampingan juru bahasa isyarat secara gratis.`;
+    // Dipecah per kalimat: SpeechSynthesis di beberapa peramban berhenti
+    // sendiri pada teks yang sangat panjang, dan potongan pendek juga
+    // membuat tombol "hentikan" terasa langsung berhenti.
+    const kalimat = teks.match(/[^.!?]+[.!?]*/g) ?? [teks];
+    let indeks = 0;
 
-    const utterance = new SpeechSynthesisUtterance(mainText);
-    utterance.lang = "id-ID";
-    utterance.rate = 0.9; // Slightly slower for elderly
-    utterance.pitch = 1;
+    const lanjut = () => {
+      if (indeks >= kalimat.length) {
+        setMembaca(false);
+        return;
+      }
+      const u = new SpeechSynthesisUtterance(kalimat[indeks].trim());
+      u.lang = "id-ID";
+      u.rate = 0.95;
+      u.onend = () => {
+        indeks += 1;
+        lanjut();
+      };
+      u.onerror = () => setMembaca(false);
+      window.speechSynthesis.speak(u);
+    };
 
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-
-    setSpeaking(true);
-    window.speechSynthesis.speak(utterance);
-    toast.success("Memulai Pembacaan Layanan Suara", {
-      description: "Suara panduan PESTA sedang membacakan informasi utama.",
-    });
+    setMembaca(true);
+    lanjut();
   };
 
-  const resetSettings = () => {
-    setTextSize("normal");
-    setHighContrast(false);
-    setReadableFont(false);
-    if (speaking) {
-      window.speechSynthesis?.cancel();
-      setSpeaking(false);
-    }
-    toast.success("Mode Aksesibilitas Direset");
+  // --- struktur halaman ----------------------------------------------------
+  const bukaStruktur = () => {
+    const judul = Array.from(
+      document.querySelectorAll<HTMLElement>("main h1, main h2, main h3, main h4")
+    );
+
+    const daftar: StrukturHalaman[] = judul
+      .map((el, i) => {
+        if (!el.id) el.id = `a11y-judul-${i}`;
+        return {
+          taraf: Number(el.tagName.slice(1)),
+          teks: (el.innerText || "").trim().slice(0, 90),
+          id: el.id,
+        };
+      })
+      .filter((j) => j.teks.length > 0);
+
+    setStruktur(daftar);
   };
+
+  const lompatKe = (id: string) => {
+    setStruktur(null);
+    setTerbuka(false);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  // --- pembantu ------------------------------------------------------------
+  const ubah = <K extends keyof Pengaturan>(kunci: K, nilai: Pengaturan[K]) =>
+    setP((lama) => ({ ...lama, [kunci]: nilai }));
+
+  const togglePro = (kunci: keyof Pengaturan) =>
+    setP((lama) => ({ ...lama, [kunci]: !lama[kunci] }));
+
+  const pakaiProfil = (kunci: KunciProfil) => {
+    const profil = PROFIL.find((x) => x.kunci === kunci);
+    if (!profil) return;
+
+    const sudahAktif = profilAktif(p, kunci);
+    setP((lama) =>
+      sudahAktif
+        ? // Mematikan profil mengembalikan HANYA penyesuaian yang dinyalakannya,
+          // bukan mereset seluruh panel - pengunjung mungkin sudah mengubah
+          // saklar lain sendiri, dan itu tidak boleh ikut hilang.
+          { ...lama, ...balikkan(profil.ubah) }
+        : { ...lama, ...profil.ubah }
+    );
+  };
+
+  const resetSemua = () => {
+    hentikanBaca();
+    setP({ ...BAWAAN });
+  };
+
+  const jumlahAktif = hitungAktif(p);
 
   return (
     <>
-      {/* Floating Accessibility Trigger Button */}
-      <div className="fixed bottom-6 left-6 z-40">
+      {/* Lompat ke konten - elemen pertama yang dijangkau Tab (WCAG 2.4.1) */}
+      <a href="#hero" className="a11y-lewati">
+        Lompat ke konten utama
+      </a>
+
+      {/* Tombol mengambang */}
+      <div className="fixed bottom-6 left-6 z-40 a11y-panel">
         <button
-          onClick={() => setIsOpen(!isOpen)}
-          className={`p-3.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-transform duration-150 hover:scale-[1.08] active:scale-95 ${
-            highContrast
-              ? "bg-yellow-400 text-black border-2 border-black ring-4 ring-yellow-400/50"
-              : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/40 ring-4 ring-indigo-500/20"
-          }`}
-          title="Buka Panel Aksesibilitas & Ramah Kelompok Rentan (Lansia / Disabilitas)"
-          aria-label="Fitur Aksesibilitas Inklusi PESTA"
+          ref={pemicuRef}
+          onClick={() => setTerbuka((v) => !v)}
+          className="relative p-3.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/40 ring-4 ring-indigo-500/20 transition-transform duration-150 hover:scale-[1.06] active:scale-95"
+          aria-label="Buka menu aksesibilitas"
+          aria-expanded={terbuka}
         >
-          <Accessibility className="w-6 h-6 animate-pulse" />
+          <Accessibility className="w-6 h-6" />
           <span className="hidden sm:inline font-extrabold pr-1">Layanan Inklusif</span>
+          {jumlahAktif > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-amber-400 text-[10px] font-extrabold text-slate-900 flex items-center justify-center">
+              {jumlahAktif}
+            </span>
+          )}
         </button>
       </div>
 
-      {/* Accessibility Control Modal / Panel */}
-      {isOpen && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-start p-4 sm:p-6 pointer-events-none">
-            {/* Backdrop */}
-            <div
-              onClick={() => setIsOpen(false)}
-              className="latar-masuk fixed inset-0 bg-slate-900/40 backdrop-blur-sm pointer-events-auto"
-            />
+      {terbuka && (
+        <div className="fixed inset-0 z-50 flex items-stretch justify-start pointer-events-none a11y-panel">
+          <div
+            onClick={() => setTerbuka(false)}
+            className="latar-masuk fixed inset-0 bg-slate-900/50 backdrop-blur-sm pointer-events-auto"
+            aria-hidden="true"
+          />
 
-            {/* Panel Card */}
-            <div
-              className="panel-masuk relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 pointer-events-auto overflow-hidden z-10"
-            >
-              {/* Header */}
-              <div className="bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 p-5 text-white flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-2xl bg-indigo-500/30 border border-indigo-400/30">
-                    <Accessibility className="w-6 h-6 text-indigo-300" />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-base flex items-center gap-1.5">
-                      Mode Aksesibilitas Inklusif
-                    </h3>
-                    <p className="text-[11px] text-indigo-200">
-                      Ramah Lansia, Tuna Rungu, & Penglihatan Terbatas
-                    </p>
-                  </div>
-                </div>
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="a11y-judul-panel"
+            className="panel-masuk relative w-full max-w-md h-full bg-slate-50 shadow-2xl pointer-events-auto overflow-hidden z-10 flex flex-col"
+          >
+            {/* Kepala */}
+            <div className="bg-indigo-700 px-5 py-4 text-white flex items-center justify-between shrink-0">
+              <h2 id="a11y-judul-panel" className="font-extrabold text-base flex items-center gap-2">
+                <Accessibility className="w-5 h-5" />
+                Menu Aksesibilitas
+              </h2>
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setIsOpen(false)}
-                  className="p-1.5 rounded-full hover:bg-white/10 text-slate-300 hover:text-white"
+                  onClick={resetSemua}
+                  className="p-2 rounded-full hover:bg-white/15"
+                  aria-label="Kembalikan semua ke pengaturan awal"
+                  title="Kembalikan semua ke pengaturan awal"
                 >
-                  <X className="w-5 h-5" />
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    setTerbuka(false);
+                    pemicuRef.current?.focus();
+                  }}
+                  className="p-2 rounded-full hover:bg-white/15"
+                  aria-label="Tutup menu aksesibilitas"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               </div>
+            </div>
 
-              {/* Controls List */}
-              <div className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
-                {/* Feature 1: Voice Reader / Text-To-Speech */}
-                <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Volume2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                      <span className="font-bold text-xs text-slate-900 dark:text-white">
-                        Pembaca Suara Layanan (Text-to-Speech)
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">
-                      Ramah Lansia & Netra
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Mendengarkan panduan suara sapaan & ringkasan informasi PESTA BPS Musi Rawas.
-                  </p>
-                  <button
-                    onClick={toggleSpeech}
-                    className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-                      speaking
-                        ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
-                        : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20"
-                    }`}
-                  >
-                    {speaking ? (
-                      <>
-                        <VolumeX className="w-4 h-4" />
-                        <span>Hentikan Suara</span>
-                      </>
-                    ) : (
-                      <>
-                        <Volume2 className="w-4 h-4" />
-                        <span>Putar Suara Panduan PESTA</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Feature 2: Text Scaling */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-5">
+              {/* --- Profil --- */}
+              <Bagian judul="Profil Aksesibilitas">
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                    <Type className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Ukuran Teks Huruf
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  {PROFIL.map((profil) => {
+                    const aktif = profilAktif(p, profil.kunci);
+                    return (
+                      <button
+                        key={profil.kunci}
+                        onClick={() => pakaiProfil(profil.kunci)}
+                        className={`w-full text-left p-3.5 rounded-2xl border flex items-start gap-3 transition-colors ${
+                          aktif
+                            ? "bg-indigo-50 border-indigo-300"
+                            : "bg-white border-slate-200 hover:border-slate-300"
+                        }`}
+                        aria-pressed={aktif}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-sm text-slate-900">{profil.nama}</div>
+                          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                            {profil.keterangan}
+                          </p>
+                        </div>
+                        <span
+                          className={`w-11 h-6 rounded-full p-1 shrink-0 transition-colors ${
+                            aktif ? "bg-indigo-600" : "bg-slate-300"
+                          }`}
+                        >
+                          <span
+                            className={`block w-4 h-4 rounded-full bg-white transition-transform ${
+                              aktif ? "translate-x-5" : ""
+                            }`}
+                          />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </Bagian>
+
+              {/* --- Penyesuaian teks --- */}
+              <Bagian judul="Penyesuaian Teks">
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-3">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Type className="w-4 h-4 text-indigo-600" />
+                    <span className="font-bold text-sm text-slate-900">Ukuran Teks</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
                     <button
-                      onClick={() => setTextSize("normal")}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
-                        textSize === "normal"
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700"
-                      }`}
+                      onClick={() => ubah("ukuranTeks", Math.max(100, p.ukuranTeks - 10))}
+                      disabled={p.ukuranTeks <= 100}
+                      className="w-10 h-10 rounded-full border border-slate-300 flex items-center justify-center hover:bg-slate-100 disabled:opacity-40"
+                      aria-label="Kecilkan ukuran teks"
                     >
-                      Normal (100%)
+                      <Minus className="w-4 h-4" />
                     </button>
+                    <span className="font-extrabold text-lg text-slate-900 tabular-nums">
+                      {p.ukuranTeks}%
+                    </span>
                     <button
-                      onClick={() => setTextSize("large")}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
-                        textSize === "large"
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700"
-                      }`}
+                      onClick={() => ubah("ukuranTeks", Math.min(160, p.ukuranTeks + 10))}
+                      disabled={p.ukuranTeks >= 160}
+                      className="w-10 h-10 rounded-full border border-slate-300 flex items-center justify-center hover:bg-slate-100 disabled:opacity-40"
+                      aria-label="Besarkan ukuran teks"
                     >
-                      Besar (115%)
-                    </button>
-                    <button
-                      onClick={() => setTextSize("xlarge")}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
-                        textSize === "xlarge"
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700"
-                      }`}
-                    >
-                      Sangat Besar (130%)
+                      <Plus className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Feature 3: High Contrast Mode */}
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
-                      <Eye className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                      Mode Kontras Tinggi (High Contrast)
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Tampilan hitam-kuning kontras tajam untuk kejelasan pandangan
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setHighContrast(!highContrast)}
-                    className={`w-12 h-6 rounded-full p-1 transition-colors ${
-                      highContrast ? "bg-yellow-400" : "bg-slate-300 dark:bg-slate-700"
-                    }`}
-                  >
-                    <div
-                      className={`w-4 h-4 rounded-full bg-slate-900 transition-transform ${
-                        highContrast ? "translate-x-6 bg-black" : "translate-x-0 bg-white"
-                      }`}
+                <div className="grid grid-cols-3 gap-2">
+                  <Ubin
+                    aktif={p.tebalTeks}
+                    onClick={() => togglePro("tebalTeks")}
+                    ikon={<Bold className="w-5 h-5" />}
+                    label="Teks Tebal"
+                  />
+                  <Ubin
+                    aktif={p.tinggiBaris}
+                    onClick={() => togglePro("tinggiBaris")}
+                    ikon={<AlignJustify className="w-5 h-5" />}
+                    label="Jarak Baris"
+                  />
+                  <Ubin
+                    aktif={p.jarakHuruf}
+                    onClick={() => togglePro("jarakHuruf")}
+                    ikon={<Move3d className="w-5 h-5" />}
+                    label="Jarak Huruf"
+                  />
+                  <Ubin
+                    aktif={p.fontDisleksia}
+                    onClick={() => togglePro("fontDisleksia")}
+                    ikon={<BookOpen className="w-5 h-5" />}
+                    label="Font Disleksia"
+                  />
+                  <Ubin
+                    aktif={p.sorotTautan}
+                    onClick={() => togglePro("sorotTautan")}
+                    ikon={<Link2 className="w-5 h-5" />}
+                    label="Sorot Tautan"
+                  />
+                  <Ubin
+                    aktif={p.sorotJudul}
+                    onClick={() => togglePro("sorotJudul")}
+                    ikon={<Heading className="w-5 h-5" />}
+                    label="Sorot Judul"
+                  />
+                </div>
+              </Bagian>
+
+              {/* --- Bantuan navigasi --- */}
+              <Bagian judul="Bantuan Navigasi">
+                <div className="grid grid-cols-3 gap-2">
+                  <Ubin
+                    aktif={p.fokusJelas}
+                    onClick={() => togglePro("fokusJelas")}
+                    ikon={<Focus className="w-5 h-5" />}
+                    label="Fokus Tegas"
+                  />
+                  <Ubin
+                    aktif={membaca}
+                    onClick={bacakanHalaman}
+                    ikon={membaca ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                    label={membaca ? "Hentikan" : "Bacakan"}
+                  />
+                  <Ubin
+                    aktif={p.penunjukBaca}
+                    onClick={() => togglePro("penunjukBaca")}
+                    ikon={<Square className="w-5 h-5" />}
+                    label="Pemandu Baca"
+                  />
+                  <Ubin
+                    aktif={p.kursorBesar}
+                    onClick={() => togglePro("kursorBesar")}
+                    ikon={<MousePointer2 className="w-5 h-5" />}
+                    label="Kursor Besar"
+                  />
+                  <Ubin
+                    aktif={false}
+                    onClick={bukaStruktur}
+                    ikon={<ListTree className="w-5 h-5" />}
+                    label="Struktur Isi"
+                  />
+                </div>
+              </Bagian>
+
+              {/* --- Warna --- */}
+              <Bagian judul="Penyesuaian Warna">
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      { nilai: "monokrom", label: "Monokrom", ikon: <Contrast className="w-5 h-5" /> },
+                      { nilai: "saturasi-rendah", label: "Warna Redup", ikon: <SunMoon className="w-5 h-5" /> },
+                      { nilai: "saturasi-tinggi", label: "Warna Pekat", ikon: <SunMoon className="w-5 h-5" /> },
+                      { nilai: "kontras-tinggi", label: "Kontras Tinggi", ikon: <Contrast className="w-5 h-5" /> },
+                      { nilai: "kontras-terang", label: "Latar Terang", ikon: <Eye className="w-5 h-5" /> },
+                      { nilai: "kontras-gelap", label: "Latar Gelap", ikon: <Eye className="w-5 h-5" /> },
+                    ] as { nilai: ModeWarna; label: string; ikon: React.ReactNode }[]
+                  ).map((w) => (
+                    <Ubin
+                      key={w.nilai}
+                      aktif={p.warna === w.nilai}
+                      onClick={() => ubah("warna", p.warna === w.nilai ? "normal" : w.nilai)}
+                      ikon={w.ikon}
+                      label={w.label}
                     />
-                  </button>
+                  ))}
                 </div>
+              </Bagian>
 
-                {/* Feature 4: Dyslexia & Clear Font */}
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
-                      <Type className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                      Font Mudah Dibaca & Spasial Jelas
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Teks dengan spasi baris lebar & huruf mudah dibaca
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setReadableFont(!readableFont)}
-                    className={`w-12 h-6 rounded-full p-1 transition-colors ${
-                      readableFont ? "bg-indigo-600" : "bg-slate-300 dark:bg-slate-700"
-                    }`}
-                  >
-                    <div
-                      className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                        readableFont ? "translate-x-6" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
+              {/* --- Alat lain --- */}
+              <Bagian judul="Alat Tambahan">
+                <div className="grid grid-cols-3 gap-2">
+                  <Ubin
+                    aktif={p.hentikanGerak}
+                    onClick={() => togglePro("hentikanGerak")}
+                    ikon={<PauseCircle className="w-5 h-5" />}
+                    label="Hentikan Gerak"
+                  />
+                  <Ubin
+                    aktif={p.sembunyikanGambar}
+                    onClick={() => togglePro("sembunyikanGambar")}
+                    ikon={<EyeOff className="w-5 h-5" />}
+                    label="Sembunyikan Gambar"
+                  />
+                  <Ubin
+                    aktif={p.tooltipGambar}
+                    onClick={() => togglePro("tooltipGambar")}
+                    ikon={<ImageIcon className="w-5 h-5" />}
+                    label="Teks Gambar"
+                  />
                 </div>
+              </Bagian>
 
-                {/* Feature 5: Deaf / Deafness & Special Disability Assistance Info */}
-                <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-xs text-emerald-900 dark:text-emerald-300">
-                    <Ear className="w-4 h-4 text-emerald-600" />
-                    Layanan Tuna Rungu & Pendampingan Isyarat
-                  </div>
-                  <p className="text-[11px] text-emerald-800 dark:text-emerald-300 leading-relaxed">
-                    Saat mendaftar konsultasi <strong>ViDCon</strong>, centang opsi <em>"Membutuhkan Juru Bahasa Isyarat (JBI)"</em>. Petugas PST BPS Musi Rawas akan langsung menyiapkan fasilitas pendampingan teks/JBI pada sesi Zoom Anda.
-                  </p>
+              {/* --- Pendampingan nyata, bukan sekadar penyesuaian tampilan --- */}
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-sm text-emerald-900">
+                  <Ear className="w-4 h-4 text-emerald-600" />
+                  Butuh Pendampingan Petugas?
                 </div>
-
-                {/* Footer Reset */}
-                <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 text-xs">
-                  <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> WCAG 2.1 AAA Compliant
-                  </span>
-                  <button
-                    onClick={resetSettings}
-                    className="font-bold text-rose-600 dark:text-rose-400 hover:underline"
-                  >
-                    Reset Pengaturan
-                  </button>
-                </div>
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  Saat mendaftar <strong>ViDCon</strong>, pilih kebutuhan pendampingan Anda -
+                  juru bahasa isyarat, penjelasan lisan, tempo perlahan, atau ruang tenang.
+                  Petugas PST menyiapkannya sebelum sesi dimulai.
+                </p>
               </div>
+
+              <button
+                onClick={resetSemua}
+                className="w-full py-3 rounded-2xl bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-sm flex items-center justify-center gap-2"
+              >
+                <Ban className="w-4 h-4" />
+                Kembalikan Pengaturan Awal
+              </button>
+            </div>
+
+            {/* Kaki - pernyataan yang bisa diperiksa, bukan klaim tanpa audit */}
+            <div className="shrink-0 px-4 py-3 border-t border-slate-200 bg-white flex items-center gap-2 text-[11px] text-slate-500">
+              <Info className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+              <span>Mengacu pada WCAG 2.1 level AA. Pengaturan tersimpan di peramban Anda.</span>
             </div>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Daftar struktur halaman */}
+      {struktur && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 a11y-panel">
+          <div
+            onClick={() => setStruktur(null)}
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            aria-hidden="true"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Struktur isi halaman"
+            className="relative w-full max-w-md max-h-[70vh] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+          >
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                <ListTree className="w-4 h-4 text-indigo-600" />
+                Struktur Isi Halaman
+              </h3>
+              <button
+                onClick={() => setStruktur(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100"
+                aria-label="Tutup struktur isi"
+              >
+                <X className="w-4 h-4 text-slate-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {struktur.length === 0 ? (
+                <p className="p-6 text-center text-sm text-slate-500">
+                  Tidak ada judul yang terbaca di halaman ini.
+                </p>
+              ) : (
+                struktur.map((j) => (
+                  <button
+                    key={j.id}
+                    onClick={() => lompatKe(j.id)}
+                    className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-indigo-50 text-sm text-slate-700"
+                    style={{ paddingLeft: `${0.75 + (j.taraf - 1) * 0.85}rem` }}
+                  >
+                    <span className="text-[10px] font-bold text-indigo-500 mr-2">H{j.taraf}</span>
+                    {j.teks}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Bagian-bagian kecil
+// ---------------------------------------------------------------------------
+
+function Bagian({ judul, children }: { judul: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className="text-[11px] font-extrabold tracking-wider uppercase text-indigo-600 mb-2.5">
+        {judul}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+function Ubin({
+  aktif,
+  onClick,
+  ikon,
+  label,
+}: {
+  aktif: boolean;
+  onClick: () => void;
+  ikon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={aktif}
+      className={`aspect-square rounded-2xl border flex flex-col items-center justify-center gap-1.5 p-2 text-center transition-colors ${
+        aktif
+          ? "bg-indigo-600 border-indigo-600 text-white"
+          : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+      }`}
+    >
+      {ikon}
+      <span className="text-[10px] font-bold leading-tight">{label}</span>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pembantu
+// ---------------------------------------------------------------------------
+
+/** Profil dianggap aktif bila SELURUH penyesuaiannya sedang berlaku. */
+function profilAktif(p: Pengaturan, kunci: KunciProfil): boolean {
+  const profil = PROFIL.find((x) => x.kunci === kunci);
+  if (!profil) return false;
+  return Object.entries(profil.ubah).every(
+    ([k, v]) => p[k as keyof Pengaturan] === v
+  );
+}
+
+/** Nilai bawaan untuk setiap kunci yang disentuh sebuah profil. */
+function balikkan(ubah: Partial<Pengaturan>): Partial<Pengaturan> {
+  const hasil: Partial<Pengaturan> = {};
+  for (const k of Object.keys(ubah) as (keyof Pengaturan)[]) {
+    (hasil[k] as Pengaturan[typeof k]) = BAWAAN[k];
+  }
+  return hasil;
+}
+
+/** Berapa penyesuaian yang sedang menyala - dipakai untuk lencana di tombol. */
+function hitungAktif(p: Pengaturan): number {
+  let n = 0;
+  for (const k of Object.keys(BAWAAN) as (keyof Pengaturan)[]) {
+    if (p[k] !== BAWAAN[k]) n += 1;
+  }
+  return n;
 }
