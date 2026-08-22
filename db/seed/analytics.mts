@@ -8,9 +8,19 @@
  * periode sebelumnya kosong. Skrip ini mengisinya agar grafik dan laporan
  * punya riwayat yang utuh.
  *
- * Angkanya disusun wajar, bukan mengesankan: tumbuh perlahan, turun di
- * akhir pekan, naik sedikit pada awal bulan saat rilis Berita Resmi
- * Statistik.
+ * PROPORSI BULANAN DITENTUKAN DARI PERMOHONAN VIDCON NYATA, bukan kurva
+ * pertumbuhan buatan. db/skrip/data-vidcon-impor.json (riwayat ViDCon dari
+ * catatan Excel kantor) menunjukkan bulan mana yang benar-benar ramai
+ * diminati warga - Desember 2025 enam permohonan, Maret 2026 lima, bulan
+ * lain satu sampai tiga. Sebaran kunjungan situs tiap bulan mengikuti
+ * proporsi yang sama, diskalakan ke rentang puluhan (maksimal seratus per
+ * bulan, SELAMANYA - bukan cuma 2025). Situs layanan kabupaten kecil,
+ * jumlah pengunjung sebesar itu yang wajar, bukan ribuan dan bukan terus
+ * bertambah tanpa batas seiring waktu.
+ *
+ * Bulan yang belum ada riwayat ViDCon-nya (Agustus 2026 dan seterusnya,
+ * sampai ada data baru) memakai bobot bawaan supaya tidak nol - lihat
+ * BOBOT_BAWAAN di bawah.
  *
  * CATATAN TEKNIS
  * Baris hasil skrip ini bertanda `is_seeded` di database. Penanda itu TIDAK
@@ -29,6 +39,29 @@ import { db } from "../../src/lib/db/index.js";
 import { analyticsDaily, analyticsPathDaily } from "../../src/lib/db/schema.js";
 
 const MULAI = "2025-01-01";
+
+/**
+ * Jumlah permohonan ViDCon nyata per bulan, kunci "YYYY-MM".
+ * Sumber: db/skrip/data-vidcon-impor.json (sheet "2025" & "2026" berkas
+ * Excel kantor). Bulan yang tidak terdaftar berarti belum ada riwayatnya -
+ * lihat BOBOT_BAWAAN.
+ */
+const HITUNG_VIDCON: Record<string, number> = {
+  "2025-01": 2, "2025-02": 2, "2025-03": 2, "2025-04": 2, "2025-05": 2, "2025-06": 2,
+  "2025-07": 2, "2025-08": 2, "2025-09": 3, "2025-10": 2, "2025-11": 3, "2025-12": 6,
+  "2026-01": 3, "2026-02": 3, "2026-03": 5, "2026-04": 2, "2026-05": 3, "2026-06": 1,
+  "2026-07": 2,
+};
+
+/** Dipakai bulan yang belum ada riwayat ViDCon-nya - sama dengan bulan paling umum di atas. */
+const BOBOT_BAWAAN = 2;
+
+/** Skala: bobot 1 => 16 kunjungan/bulan. Bobot tertinggi (6, Des 2025) => 96 - selalu di bawah 100. */
+const SATUAN_PER_BOBOT = 16;
+
+function targetBulanan(bulanKey: string): number {
+  return (HITUNG_VIDCON[bulanKey] ?? BOBOT_BAWAAN) * SATUAN_PER_BOBOT;
+}
 
 function* rentangTanggal(dari: string, sampai: string) {
   const d = new Date(dari + "T00:00:00Z");
@@ -60,61 +93,92 @@ function acakTerkunci(benih: number): () => number {
   };
 }
 
+/** Bobot mentah satu hari sebelum dinormalkan ke target bulanan: pola akhir pekan + rilis BRS. */
+function bobotHari(tanggal: string, acak: () => number): number {
+  const d = new Date(tanggal + "T00:00:00Z");
+  const hari = d.getUTCDay();
+  const tanggalBulan = d.getUTCDate();
+
+  const faktorHari = hari === 0 || hari === 6 ? 0.35 : 1;
+  const faktorRilis = tanggalBulan <= 5 ? 1.35 : 1;
+  const derau = 0.75 + acak() * 0.5;
+
+  return faktorHari * faktorRilis * derau;
+}
+
+async function simpanHari(
+  tanggal: string,
+  views: number,
+  acak: () => number
+): Promise<boolean> {
+  const unik = Math.max(1, Math.round(views * (0.6 + acak() * 0.15)));
+
+  const [ada] = await db
+    .select({ id: analyticsDaily.id, isSeeded: analyticsDaily.isSeeded })
+    .from(analyticsDaily)
+    .where(eq(analyticsDaily.tanggal, tanggal))
+    .limit(1);
+
+  if (ada) {
+    // Jangan menimpa hari yang sudah punya catatan kunjungan nyata.
+    if (!ada.isSeeded) return false;
+    await db
+      .update(analyticsDaily)
+      .set({ views, uniqueVisitors: unik })
+      .where(eq(analyticsDaily.id, ada.id));
+  } else {
+    await db.insert(analyticsDaily).values({ tanggal, views, uniqueVisitors: unik, isSeeded: true });
+  }
+
+  await isiPerHalaman(tanggal, views, unik, acak);
+  return true;
+}
+
 async function isi() {
   const hariIni = new Date().toISOString().slice(0, 10);
   const acak = acakTerkunci(20250101);
 
   let dibuat = 0;
   let dilewat = 0;
-  let indeks = 0;
 
-  for (const tanggal of rentangTanggal(MULAI, hariIni)) {
-    indeks += 1;
-    const hari = new Date(tanggal + "T00:00:00Z").getUTCDay();
-    const tanggalBulan = Number(tanggal.slice(8, 10));
+  // Satu bulan pada satu waktu, dari Januari 2025 sampai bulan berjalan
+  // sekarang - termasuk bulan yang belum penuh (hariBulan otomatis berhenti
+  // di hariIni, jadi targetnya juga diskalakan proporsional terhadap jumlah
+  // hari yang benar-benar sudah lewat, bukan seluruh bulan).
+  let tahun = 2025;
+  let bulan = 1;
 
-    // Pertumbuhan perlahan: sekitar 18 kunjungan/hari di awal 2025,
-    // naik bertahap seiring waktu.
-    const dasar = 18 + indeks * 0.075;
+  while (true) {
+    const bulanKey = `${tahun}-${String(bulan).padStart(2, "0")}`;
+    const dariBulan = `${bulanKey}-01`;
+    if (dariBulan > hariIni) break;
 
-    // Akhir pekan jauh lebih sepi untuk situs layanan instansi.
-    const faktorHari = hari === 0 || hari === 6 ? 0.35 : 1;
+    const akhirBulanPenuh = new Date(Date.UTC(tahun, bulan, 0)).toISOString().slice(0, 10);
+    const akhirBulan = akhirBulanPenuh < hariIni ? akhirBulanPenuh : hariIni;
 
-    // Awal bulan sedikit ramai - rilis Berita Resmi Statistik.
-    const faktorRilis = tanggalBulan <= 5 ? 1.35 : 1;
+    const hariBulan = [...rentangTanggal(dariBulan, akhirBulan)];
+    const bobot = hariBulan.map((t) => bobotHari(t, acak));
+    const totalBobot = bobot.reduce((a, b) => a + b, 0);
 
-    const derau = 0.75 + acak() * 0.5;
-    const views = Math.max(3, Math.round(dasar * faktorHari * faktorRilis * derau));
-    // Sebagian pengunjung membuka lebih dari satu halaman.
-    const unik = Math.max(2, Math.round(views * (0.6 + acak() * 0.15)));
+    // Target bulan penuh, diskalakan ke jumlah hari yang tersedia - supaya
+    // bulan yang baru berjalan separuh tidak dipaksa mencapai target penuh
+    // dalam beberapa hari saja (yang akan membuat harian meloncat tinggi).
+    const jumlahHariPenuh = new Date(Date.UTC(tahun, bulan, 0)).getUTCDate();
+    const target = targetBulanan(bulanKey) * (hariBulan.length / jumlahHariPenuh);
 
-    const [ada] = await db
-      .select({ id: analyticsDaily.id, isSeeded: analyticsDaily.isSeeded })
-      .from(analyticsDaily)
-      .where(eq(analyticsDaily.tanggal, tanggal))
-      .limit(1);
-
-    if (ada) {
-      // Jangan menimpa hari yang sudah punya catatan kunjungan nyata.
-      if (!ada.isSeeded) {
-        dilewat += 1;
-        continue;
-      }
-      await db
-        .update(analyticsDaily)
-        .set({ views, uniqueVisitors: unik })
-        .where(eq(analyticsDaily.id, ada.id));
-    } else {
-      await db.insert(analyticsDaily).values({
-        tanggal,
-        views,
-        uniqueVisitors: unik,
-        isSeeded: true,
-      });
+    for (let i = 0; i < hariBulan.length; i++) {
+      // Minimal 1 kunjungan/hari - situs instansi tidak pernah benar-benar nol.
+      const views = Math.max(1, Math.round((bobot[i] / totalBobot) * target));
+      const berhasil = await simpanHari(hariBulan[i], views, acak);
+      if (berhasil) dibuat += 1;
+      else dilewat += 1;
     }
 
-    await isiPerHalaman(tanggal, views, unik, acak);
-    dibuat += 1;
+    bulan += 1;
+    if (bulan > 12) {
+      bulan = 1;
+      tahun += 1;
+    }
   }
 
   console.log(`  Riwayat terisi  : ${dibuat} hari (${MULAI} s.d. ${hariIni})`);
@@ -122,8 +186,9 @@ async function isi() {
     console.log(`  Dilewati        : ${dilewat} hari sudah berisi catatan nyata`);
   }
   console.log("");
-  console.log("  Riwayat terisi. Pencatatan kunjungan nyata berjalan otomatis");
-  console.log("  sejak sekarang dan akan menambah data setelah tanggal ini.");
+  console.log("  Proporsi tiap bulan mengikuti permohonan ViDCon nyata pada");
+  console.log("  bulan yang sama (lihat HITUNG_VIDCON di berkas ini) - selalu");
+  console.log("  di kisaran puluhan, maksimal seratus kunjungan per bulan.");
   console.log("");
   console.log("  Buang riwayat hasil skrip ini dengan:");
   console.log("    npm run db:seed:analitik -- hapus");
