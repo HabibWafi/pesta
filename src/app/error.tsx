@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Muncul from "@/components/ui/Muncul";
+import { adalahGalatChunk, bolehMuatUlang } from "@/lib/pemulihan-chunk";
 import { RotateCcw, Home, AlertOctagon, ShieldAlert } from "lucide-react";
 
 export default function Error({
@@ -13,9 +14,43 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  /*
+   * Chunk hilang karena situs baru saja di-deploy: pulihkan sendiri.
+   *
+   * reset() TIDAK cukup - ia hanya merender ulang batas galat ini, dan chunk
+   * yang diminta tetap saja sudah tidak ada di server. Yang dibutuhkan adalah
+   * mengambil HTML baru, yang menyebut nama chunk versi sekarang. Itu berarti
+   * muat ulang penuh.
+   *
+   * Aman dilakukan otomatis di sini, dan hanya di sini: begitu batas galat
+   * tampil, isi halaman beserta apa pun yang sedang diketik pengunjung sudah
+   * hilang duluan. Tidak ada yang bisa diselamatkan lagi, jadi memuat ulang
+   * tidak mengorbankan apa pun. (Bandingkan dengan PemulihChunk.tsx, yang
+   * justru TIDAK boleh memuat ulang sendiri karena di sana halaman masih utuh.)
+   *
+   * Diputuskan lewat penginisialisasi useState yang hanya jalan SEKALI, bukan
+   * di dalam effect: pagar anti-putaran di bolehMuatUlang() mencatat waktu
+   * percobaan, jadi memanggilnya dua kali akan membakar jatahnya sendiri.
+   * Sekaligus menghindari setState di dalam effect, yang memicu render
+   * beruntun.
+   */
+  const [memulihkan] = useState(() => adalahGalatChunk(error) && bolehMuatUlang());
+
   useEffect(() => {
     console.error("Global Error Caught:", error);
-  }, [error]);
+    if (memulihkan) window.location.reload();
+  }, [error, memulihkan]);
+
+  // Layar antara supaya pengunjung tidak sempat melihat galat merah untuk
+  // sesuatu yang sedang diperbaiki sendiri dalam hitungan detik.
+  if (memulihkan) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center gap-4 p-6">
+        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-slate-300">Memperbarui halaman ke versi terbaru...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden selection:bg-indigo-500 selection:text-white">

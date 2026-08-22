@@ -267,6 +267,36 @@ staging, percobaan pertama akan langsung mengenai warga sungguhan.
 | Login selalu gagal | `JWT_SECRET` berubah? Semua sesi lama batal, coba login ulang |
 | "Terlalu banyak percobaan login" | Pembatas 5 kali gagal / 15 menit. Tunggu, atau restart aplikasi |
 | Peta kotak kosong | Biasanya jaringan. Coba ganti jenis peta ke OpenStreetMap di `/admin/konten` |
+| `Failed to load chunk ...js` sesaat setelah deploy | **Normal, dan sudah ditangani sendiri.** Lihat penjelasan di bawah |
+
+### Galat "Failed to load chunk" setelah deploy
+
+Nama berkas JavaScript mengandung sidik isi, jadi berubah total tiap kali
+situs di-build. Saat versi baru terbit, berkas versi lama **dihapus** dari
+server. Pengunjung yang tab-nya sudah terbuka sejak sebelum deploy masih
+memegang HTML lama; begitu ia menggulir ke bawah atau membuka formulir,
+browser meminta berkas yang sudah tidak ada - dan dapat 404.
+
+Ini bukan kerusakan server dan bukan bug. Ini konsekuensi wajar dari
+mengganti versi saat masih ada orang membaca versi sebelumnya, dan hanya
+berlaku pada tab yang sudah terbuka - pengunjung baru langsung mendapat
+versi terbaru.
+
+Sistem sudah memulihkannya sendiri (`src/lib/pemulihan-chunk.ts`):
+
+- Bila halamannya sudah telanjur gagal render, halaman **dimuat ulang
+  otomatis** - maksimal sekali per 15 detik, supaya deploy yang benar-benar
+  rusak tidak menjebak warga dalam lingkaran reload tanpa akhir.
+- Bila halaman masih utuh (mis. menekan tombol yang membuka formulir),
+  yang muncul hanya pemberitahuan berikut tombol **Muat Ulang** - tidak
+  memuat ulang diam-diam, supaya isian yang sedang diketik tidak hilang.
+
+**Yang perlu dilakukan petugas: tidak ada.** Cukup pastikan gejalanya hilang
+setelah halaman dimuat ulang. Kalau `Failed to load chunk` masih muncul
+terus-menerus **beberapa menit setelah** deploy selesai, barulah itu
+pertanda build-nya memang bermasalah - periksa log Node.js di hPanel.
+
+Uji pagar pengamannya: `npm run uji:chunk`
 
 **Mengembalikan versi sebelumnya:** di hPanel Git, tarik commit lama, lalu
 `npm ci --omit=dev && npm run build` dan restart. Migration database tidak
