@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -8,8 +9,11 @@ import {
   type PermintaanDataFormData,
   FORMAT_DATA,
   FORMAT_DATA_LABEL,
+  LAMPIRAN_EKSTENSI,
+  LAMPIRAN_MAKS_BYTE,
+  lampiranValid,
 } from "@/lib/schemas/permintaan-data";
-import { X, Database, User, Building, Mail, Phone, FileText, CheckCircle2 } from "lucide-react";
+import { X, Database, User, Building, Mail, Phone, FileText, CheckCircle2, Paperclip } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface PermintaanDataModalProps {
@@ -28,13 +32,58 @@ export default function PermintaanDataModal({ isOpen, onClose }: PermintaanDataM
     defaultValues: { formatDiinginkan: "SOFT_FILE" },
   });
 
+  // Lampiran di luar react-hook-form/Zod - File tidak berguna divalidasi
+  // lewat skema domain yang sama dengan alur WhatsApp (yang tidak pernah
+  // punya lampiran sama sekali). Divalidasi terpisah, ringan, sekadar
+  // kenyamanan; yang menentukan tetap pemeriksaan di server.
+  //
+  // Input berkas tidak punya `value` terkendali di React - satu-satunya
+  // cara mengosongkannya lagi adalah memasang ulang elemennya. `resetKey`
+  // yang berubah memaksa React membuang elemen lama dan memasang yang
+  // baru, tanpa perlu menyentuh ref sama sekali.
+  const [resetKey, setResetKey] = useState(0);
+  const [lampiran, setLampiran] = useState<File | null>(null);
+  const [galatLampiran, setGalatLampiran] = useState<string | null>(null);
+
+  const pilihLampiran = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const berkas = e.target.files?.[0] ?? null;
+    if (!berkas) {
+      setLampiran(null);
+      setGalatLampiran(null);
+      return;
+    }
+    const cek = lampiranValid(berkas.name, berkas.size);
+    if (!cek.ok) {
+      setGalatLampiran(cek.pesan);
+      setLampiran(null);
+      setResetKey((k) => k + 1);
+      return;
+    }
+    setGalatLampiran(null);
+    setLampiran(berkas);
+  };
+
+  const hapusLampiran = () => {
+    setLampiran(null);
+    setGalatLampiran(null);
+    setResetKey((k) => k + 1);
+  };
+
   const onSubmit = async (data: PermintaanDataFormData) => {
     try {
-      const res = await fetch("/api/permintaan-data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      const formData = new FormData();
+      formData.append("nama", data.nama);
+      formData.append("instansi", data.instansi);
+      formData.append("alamat", data.alamat);
+      formData.append("noHp", data.noHp);
+      formData.append("email", data.email);
+      formData.append("jenisData", data.jenisData);
+      formData.append("keperluan", data.keperluan);
+      formData.append("formatDiinginkan", data.formatDiinginkan ?? "SOFT_FILE");
+      if (data.catatan) formData.append("catatan", data.catatan);
+      if (lampiran) formData.append("lampiran", lampiran);
+
+      const res = await fetch("/api/permintaan-data", { method: "POST", body: formData });
 
       const json = await res.json();
       if (!res.ok || !json.success) {
@@ -45,6 +94,7 @@ export default function PermintaanDataModal({ isOpen, onClose }: PermintaanDataM
         description: `Halo ${data.nama}, permintaan data Anda sudah masuk ke sistem BPS Musi Rawas. Petugas akan menghubungi Anda lewat email/WhatsApp.`,
       });
       reset();
+      hapusLampiran();
       onClose();
     } catch (err) {
       toast.error("Gagal Mengirim Permintaan Data", {
@@ -214,6 +264,41 @@ export default function PermintaanDataModal({ isOpen, onClose }: PermintaanDataM
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
               />
               {errors.catatan && <p className="text-xs text-rose-500 mt-1">{errors.catatan.message}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                <Paperclip className="w-3.5 h-3.5 text-blue-600" /> Lampiran Pendukung (opsional)
+              </label>
+              <input
+                key={resetKey}
+                type="file"
+                accept={LAMPIRAN_EKSTENSI.join(",")}
+                onChange={pilihLampiran}
+                className="w-full text-xs text-slate-600 file:mr-3 file:px-3.5 file:py-2 file:rounded-xl file:border-0 file:bg-blue-50 file:text-blue-700 file:font-semibold file:text-xs hover:file:bg-blue-100"
+              />
+              {lampiran && (
+                <div className="mt-1.5 flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-100">
+                  <span className="text-[11px] text-blue-800 truncate">
+                    {lampiran.name} ({(lampiran.size / 1024).toFixed(0)} KB)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={hapusLampiran}
+                    className="text-[11px] text-rose-500 font-semibold shrink-0 hover:underline"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              )}
+              {galatLampiran ? (
+                <p className="text-xs text-rose-500 mt-1">{galatLampiran}</p>
+              ) : (
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Format {LAMPIRAN_EKSTENSI.join(", ")} - maksimal {LAMPIRAN_MAKS_BYTE / (1024 * 1024)} MB.
+                  Mis. contoh format tabel, daftar variabel, atau surat pengantar instansi.
+                </p>
+              )}
             </div>
 
             <div className="pt-3 flex items-center justify-between border-t border-slate-100">

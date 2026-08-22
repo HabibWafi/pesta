@@ -18,6 +18,7 @@ import {
   ArrowDown,
   ChevronLeft,
   ChevronRight,
+  Paperclip,
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -27,12 +28,15 @@ import { FORMAT_DATA_LABEL, type FormatData } from "@/lib/schemas/permintaan-dat
 type SortField = "nama" | "jenisData" | "status";
 type SortOrder = "asc" | "desc";
 
+/** Bentuk yang benar-benar dikirim API - tanpa lampiranData (BLOB), lihat route.ts. */
+type BarisPermintaanData = Omit<PermintaanData, "lampiranData">;
+
 export default function AdminPermintaanDataPage() {
-  const [items, setItems] = useState<PermintaanData[]>([]);
+  const [items, setItems] = useState<BarisPermintaanData[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [selectedItem, setSelectedItem] = useState<PermintaanData | null>(null);
+  const [selectedItem, setSelectedItem] = useState<BarisPermintaanData | null>(null);
   const [editStatus, setEditStatus] = useState("DIPROSES");
   const [catatan, setCatatan] = useState("");
   const [updating, setUpdating] = useState(false);
@@ -88,7 +92,7 @@ export default function AdminPermintaanDataPage() {
   };
 
   const sortedItems = useMemo(() => {
-    const kunci = (item: PermintaanData): string => String(item[sortField] ?? "").toLowerCase();
+    const kunci = (item: BarisPermintaanData): string => String(item[sortField] ?? "").toLowerCase();
     return [...items].sort((a, b) => {
       const aVal = kunci(a);
       const bVal = kunci(b);
@@ -105,7 +109,7 @@ export default function AdminPermintaanDataPage() {
     return sortedItems.slice(start, start + itemsPerPage);
   }, [sortedItems, currentPage]);
 
-  const openEditModal = (item: PermintaanData) => {
+  const openEditModal = (item: BarisPermintaanData) => {
     setSelectedItem(item);
     setEditStatus(item.status);
     setCatatan(item.catatanAdmin || "");
@@ -305,6 +309,14 @@ export default function AdminPermintaanDataPage() {
                           {item.nama}
                         </p>
                         {getSumberBadge(item.sumber)}
+                        {item.lampiranNama && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 font-extrabold text-[9px] border border-indigo-300"
+                            title={`Ada lampiran: ${item.lampiranNama}`}
+                          >
+                            <Paperclip className="w-2.5 h-2.5" />
+                          </span>
+                        )}
                       </div>
                       <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-300 truncate mt-0.5" title={item.asalInstansi}>
                         <Building className="w-3 h-3 text-blue-500 dark:text-blue-400 shrink-0" />
@@ -428,6 +440,19 @@ export default function AdminPermintaanDataPage() {
               <p><strong className="text-slate-900 dark:text-white">Format:</strong> {FORMAT_DATA_LABEL[selectedItem.formatDiinginkan as FormatData] ?? selectedItem.formatDiinginkan}</p>
               {selectedItem.catatan && (
                 <p><strong className="text-slate-900 dark:text-white">Catatan pemohon:</strong> {selectedItem.catatan}</p>
+              )}
+              {selectedItem.lampiranNama && (
+                <p className="pt-1 mt-1 border-t border-slate-200 dark:border-slate-700">
+                  <strong className="text-slate-900 dark:text-white">Lampiran:</strong>{" "}
+                  <a
+                    href={`/api/admin/permintaan-data/${selectedItem.id}/lampiran`}
+                    className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
+                  >
+                    <Paperclip className="w-3 h-3" />
+                    {selectedItem.lampiranNama}
+                    {selectedItem.lampiranUkuran ? ` (${(selectedItem.lampiranUkuran / 1024).toFixed(0)} KB)` : ""}
+                  </a>
+                </p>
               )}
             </div>
 

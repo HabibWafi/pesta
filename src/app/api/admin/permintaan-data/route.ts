@@ -5,6 +5,34 @@ import { permintaanData } from "@/lib/db/schema";
 import { containsAny } from "@/lib/db/filters";
 import { getAdminSession } from "@/lib/auth";
 
+/**
+ * Kolom yang dikirim ke admin - TANPA lampiranData.
+ *
+ * Isi berkas bisa berukuran megabita; mengikutkannya di setiap baris
+ * daftar membengkakkan respons untuk sesuatu yang bahkan tidak ditampilkan
+ * di tabel. Berkasnya diambil terpisah lewat rute unduh saat dibutuhkan.
+ */
+const kolomDaftar = {
+  id: permintaanData.id,
+  nama: permintaanData.nama,
+  asalInstansi: permintaanData.asalInstansi,
+  alamat: permintaanData.alamat,
+  noHp: permintaanData.noHp,
+  email: permintaanData.email,
+  jenisData: permintaanData.jenisData,
+  keperluan: permintaanData.keperluan,
+  formatDiinginkan: permintaanData.formatDiinginkan,
+  catatan: permintaanData.catatan,
+  status: permintaanData.status,
+  catatanAdmin: permintaanData.catatanAdmin,
+  sumber: permintaanData.sumber,
+  lampiranNama: permintaanData.lampiranNama,
+  lampiranTipe: permintaanData.lampiranTipe,
+  lampiranUkuran: permintaanData.lampiranUkuran,
+  createdAt: permintaanData.createdAt,
+  updatedAt: permintaanData.updatedAt,
+};
+
 export async function GET(req: Request) {
   const session = await getAdminSession();
   if (!session) {
@@ -29,7 +57,7 @@ export async function GET(req: Request) {
     if (search) conditions.push(search);
 
     const items = await db
-      .select()
+      .select(kolomDaftar)
       .from(permintaanData)
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(desc(permintaanData.createdAt));
@@ -71,7 +99,7 @@ export async function PUT(req: Request) {
     }
 
     const [updated] = await db
-      .select()
+      .select(kolomDaftar)
       .from(permintaanData)
       .where(eq(permintaanData.id, Number(id)))
       .limit(1);

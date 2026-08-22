@@ -32,3 +32,29 @@ export const permintaanDataSchema = z.object({
 
 export type PermintaanDataInput = z.output<typeof permintaanDataSchema>;
 export type PermintaanDataFormData = z.input<typeof permintaanDataSchema>;
+
+/**
+ * Lampiran pendukung, opsional - hanya lewat formulir web (lihat catatan
+ * di src/lib/db/schema.ts soal kenapa WhatsApp tidak ikut).
+ *
+ * SATU-SATUNYA daftar format & batas ukuran, dipakai bersama oleh
+ * PermintaanDataModal (validasi dini, sekadar kenyamanan) dan
+ * /api/permintaan-data (validasi yang sebenarnya menentukan).
+ */
+export const LAMPIRAN_EKSTENSI = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv"] as const;
+export const LAMPIRAN_MAKS_BYTE = 5 * 1024 * 1024; // 5 MB
+
+export function ekstensiLampiran(namaBerkas: string): string {
+  const titik = namaBerkas.lastIndexOf(".");
+  return titik === -1 ? "" : namaBerkas.slice(titik).toLowerCase();
+}
+
+export function lampiranValid(namaBerkas: string, ukuran: number): { ok: true } | { ok: false; pesan: string } {
+  if (ukuran > LAMPIRAN_MAKS_BYTE) {
+    return { ok: false, pesan: `Ukuran lampiran maksimal ${LAMPIRAN_MAKS_BYTE / (1024 * 1024)} MB.` };
+  }
+  if (!LAMPIRAN_EKSTENSI.includes(ekstensiLampiran(namaBerkas) as (typeof LAMPIRAN_EKSTENSI)[number])) {
+    return { ok: false, pesan: `Format lampiran harus salah satu dari: ${LAMPIRAN_EKSTENSI.join(", ")}.` };
+  }
+  return { ok: true };
+}

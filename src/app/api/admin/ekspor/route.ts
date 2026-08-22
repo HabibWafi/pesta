@@ -61,8 +61,27 @@ export async function GET(req: Request) {
     }
 
     if (jenis === "permintaan-data") {
+      // Tanpa lampiranData (BLOB) - CSV cuma butuh tahu ADA tidaknya
+      // lampiran, bukan isi berkasnya. Mengikutkan BLOB di sini akan
+      // menahan seluruh isi berkas semua baris di memori sekaligus.
       const baris = await db
-        .select()
+        .select({
+          id: permintaanData.id,
+          nama: permintaanData.nama,
+          asalInstansi: permintaanData.asalInstansi,
+          alamat: permintaanData.alamat,
+          noHp: permintaanData.noHp,
+          email: permintaanData.email,
+          jenisData: permintaanData.jenisData,
+          keperluan: permintaanData.keperluan,
+          formatDiinginkan: permintaanData.formatDiinginkan,
+          catatan: permintaanData.catatan,
+          status: permintaanData.status,
+          catatanAdmin: permintaanData.catatanAdmin,
+          sumber: permintaanData.sumber,
+          lampiranNama: permintaanData.lampiranNama,
+          createdAt: permintaanData.createdAt,
+        })
         .from(permintaanData)
         .orderBy(desc(permintaanData.createdAt));
 
@@ -70,12 +89,12 @@ export async function GET(req: Request) {
         [
           "id", "nama", "asal_instansi", "alamat", "no_hp", "email",
           "jenis_data", "keperluan", "format_diinginkan", "catatan",
-          "status", "catatan_admin", "sumber", "dibuat",
+          "status", "catatan_admin", "sumber", "lampiran", "dibuat",
         ],
         baris.map<NilaiSel[]>((v) => [
           v.id, v.nama, v.asalInstansi, v.alamat, v.noHp, v.email,
           v.jenisData, v.keperluan, v.formatDiinginkan, v.catatan,
-          v.status, v.catatanAdmin, v.sumber, v.createdAt,
+          v.status, v.catatanAdmin, v.sumber, v.lampiranNama, v.createdAt,
         ])
       );
       return responsCsv(`permintaan-data-pesta-${stempel}.csv`, isi);

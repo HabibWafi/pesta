@@ -10,9 +10,23 @@ import {
   date,
   index,
   unique,
+  customType,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
+
+/**
+ * LONGBLOB - drizzle-orm 0.45 belum menyediakan helper bawaan untuk ini
+ * (hanya `binary`/`varbinary` yang panjangnya wajib dipatok kecil, maksimal
+ * 65.535 byte gabungan per baris - terlalu kecil untuk lampiran PDF/Word/
+ * Excel). `customType` memetakannya langsung ke Buffer Node, sama seperti
+ * cara mysql2 mengembalikan kolom BLOB apa pun.
+ */
+const longblob = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "longblob";
+  },
+});
 
 /**
  * Skema database PESTA (Drizzle ORM, dialek MySQL).
@@ -174,6 +188,20 @@ export const permintaanData = mysqlTable("permintaan_data", {
   catatanAdmin: text("catatan_admin"),
   /** Kanal masuknya permintaan: WEB | WHATSAPP. */
   sumber: varchar("sumber", { length: 20 }).default("WEB").notNull(),
+
+  /**
+   * Lampiran pendukung, opsional - mis. contoh format tabel yang diminta,
+   * daftar variabel, atau surat pengantar instansi. Hanya dari jalur WEB;
+   * webhook WhatsApp sengaja tidak pernah mengunduh media (lihat catatan
+   * di src/app/api/beregam/webhook/route.ts - kuota disk Hostinger terbatas).
+   * Disimpan di database, bukan filesystem, supaya ikut tercakup backup
+   * mingguan yang sudah ada (`npm run db:backup`) tanpa jalur cadangan baru.
+   */
+  lampiranNama: varchar("lampiran_nama", { length: 255 }),
+  lampiranTipe: varchar("lampiran_tipe", { length: 150 }),
+  lampiranUkuran: int("lampiran_ukuran"),
+  lampiranData: longblob("lampiran_data"),
+
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
