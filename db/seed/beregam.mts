@@ -88,8 +88,7 @@ const MENU = [
       "📮 Baik, saya bantu catat aduan/saran Anda di sini. Kanal lain yang " +
       "juga tersedia: SP4N-LAPOR! (https://www.lapor.go.id) dan " +
       "Whistleblowing System BPS " +
-      "(https://webapps.bps.go.id/pengaduan/wbs/beranda).\n\n" +
-      "Beberapa pertanyaan singkat ya. Ketik *batal* kapan saja untuk keluar.",
+      "(https://webapps.bps.go.id/pengaduan/wbs/beranda).",
   },
   {
     menuKey: "8",

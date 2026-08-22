@@ -1,37 +1,29 @@
-"use client";
+import { redirect } from "next/navigation";
+import { getAdminSession } from "@/lib/auth";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-export default function AdminIndexPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const checkUserSession = async () => {
-      try {
-        const res = await fetch("/api/auth/me");
-        const data = await res.json();
-        if (res.ok && data.success && data.user) {
-          // Already authenticated -> Redirect straight to dashboard
-          router.replace("/admin/dashboard");
-        } else {
-          // Not authenticated -> Redirect to login page
-          router.replace("/admin/login");
-        }
-      } catch (err) {
-        router.replace("/admin/login");
-      }
-    };
-
-    checkUserSession();
-  }, [router]);
-
-  return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white text-sm">
-      <div className="flex items-center gap-3">
-        <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-        <span>Mengarahkan ke Panel Administrator...</span>
-      </div>
-    </div>
-  );
+/**
+ * Pintu masuk /admin - hanya mengalihkan, tidak menggambar apa pun.
+ *
+ * SENGAJA Server Component, bukan client. Versi sebelumnya adalah client
+ * component yang memanggil /api/auth/me lalu router.replace() ke tujuannya,
+ * dan itu punya satu kelemahan yang baru terasa saat situs di-deploy ulang:
+ * router.replace() adalah navigasi sisi klien, jadi browser harus mengambil
+ * berkas JavaScript halaman tujuan lebih dulu. Kalau berkas itu milik versi
+ * lama yang sudah dihapus server, yang muncul justru layar galat - padahal
+ * pengunjungnya cuma ingin membuka panel admin.
+ *
+ * Mengalihkan di server menghapus seluruh rantai itu: tidak ada halaman yang
+ * dirender, tidak ada permintaan /api/auth/me, tidak ada navigasi sisi klien,
+ * dan tidak ada satu pun berkas JavaScript yang perlu diambil. Sekaligus
+ * lebih cepat - satu pengalihan, bukan muat halaman lalu panggil API lalu
+ * pindah halaman lagi.
+ *
+ * src/proxy.ts sudah mengalihkan lebih awal lagi, sebelum apa pun dirender.
+ * Berkas ini tetap dipertahankan sebagai lapis kedua, mengikuti kebiasaan
+ * proyek ini: kalau proxy suatu saat diubah atau dilewati, perilakunya tetap
+ * benar dan bukan halaman kosong.
+ */
+export default async function AdminIndexPage() {
+  const sesi = await getAdminSession();
+  redirect(sesi ? "/admin/dashboard" : "/admin/login");
 }

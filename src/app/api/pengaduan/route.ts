@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { pengaduans } from "@/lib/db/schema";
 import { aduanSchema } from "@/lib/schemas/aduan";
+import { beritahuPermohonanBaru } from "@/lib/beregam/notifikasi";
 import * as z from "zod";
 
 export async function POST(req: Request) {
@@ -29,6 +30,15 @@ export async function POST(req: Request) {
       .from(pengaduans)
       .where(eq(pengaduans.id, inserted.id))
       .limit(1);
+
+    await beritahuPermohonanBaru({
+      jenis: "pengaduan",
+      id: inserted.id,
+      nama: data.nama,
+      sumber: "WEB",
+      kontak: data.noHp || data.email,
+      baris: [`Kategori: ${data.kategori}`],
+    });
 
     return NextResponse.json(
       {

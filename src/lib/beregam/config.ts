@@ -38,10 +38,31 @@ const configSchema = z.object({
    */
   staleThresholdMinutes: angka(15),
 
+  /**
+   * Pembatas laju - MILIK KITA SENDIRI, bukan aturan WAHA atau WhatsApp.
+   *
+   * WAHA tidak memaksakan batas apa pun; angka di sini murni keputusan
+   * proyek ini, dan bisa diubah lewat BEREGAM_RATE_PER_MENIT tanpa deploy
+   * ulang kode.
+   *
+   * Yang sebenarnya dijaga `perMinute` bukan risiko blokir WhatsApp -
+   * membalas orang yang memang sedang mengajak bicara adalah perilaku wajar,
+   * dan risiko blokir jauh lebih ditentukan `dailyCap` beserta pola kirim
+   * massal. Yang dijaga adalah BOT YANG MENGAMUK: satu bug yang membuat bot
+   * membalas pesannya sendiri bisa mengirim ratusan pesan ke satu nomor
+   * dalam hitungan detik. Pagar per menit inilah yang menahannya.
+   *
+   * Bawaannya dinaikkan dari 3 ke 10. Angka 3 dulu dipilih saat bot hanya
+   * menjawab menu, dan ternyata terlalu ketat begitu ada alur yang butuh
+   * beberapa balasan berturut-turut - warga yang mengetik cepat menabraknya
+   * lalu bot mendadak diam, yang dari sisi warga terlihat seperti layanan
+   * rusak. 10 masih menahan bot mengamuk (yang akan mengirim ratusan, bukan
+   * belasan) tanpa pernah mengganggu pemakaian yang wajar.
+   */
   rateLimit: z.object({
     /** Maksimal balasan per nomor per menit. */
-    perMinute: angka(3),
-    /** Batas harian seluruh pesan keluar. */
+    perMinute: angka(10),
+    /** Batas harian seluruh pesan keluar. Ini pagar utama terhadap risiko blokir. */
     dailyCap: angka(500),
   }),
 

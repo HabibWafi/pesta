@@ -6,38 +6,45 @@ import { aduanSchema } from "@/lib/schemas/aduan";
 import { permintaanDataSchema } from "@/lib/schemas/permintaan-data";
 import { komponenWib } from "@/lib/waktu";
 import { getConfig } from "./config";
+import { beritahuPermohonanBaru } from "./notifikasi";
 import type { BeregamContact } from "./db/schema";
 
 /**
- * Formulir layanan yang bisa diisi langsung di percakapan WhatsApp.
+ * Formulir layanan yang diisi langsung di percakapan WhatsApp.
  *
- * Sebelumnya menu 2 (permintaan data), 3 (ViDCon), dan 7 (pengaduan) hanya
- * membalas dengan tautan ke web PESTA - warga harus pindah aplikasi untuk
- * benar-benar mengajukan. Sekarang isiannya dikumpulkan langkah demi
- * langkah di sini, lalu masuk ke TABEL YANG SAMA PERSIS dengan formulir
- * web (vidcon_requests, pengaduans, permintaan_data) - satu antrean kerja
- * bagi petugas, bukan dua yang terpisah.
+ * SATU PESAN, BUKAN TANYA-JAWAB BERTAHAP.
+ *
+ * Versi pertama menanyakan isian satu per satu - sepuluh pertanyaan berarti
+ * sepuluh balasan bot. Itu keliru untuk WhatsApp, karena dua alasan yang
+ * saling menguatkan:
+ *
+ *   1. Ada pembatas laju balasan per nomor (lihat rateLimit di config.ts).
+ *      Warga yang menjawab cepat - dan itu wajar - akan menabraknya di
+ *      tengah formulir, lalu bot mendadak diam. Dari sisi warga, layanannya
+ *      terlihat rusak persis saat ia sedang serius memakainya.
+ *   2. Sepuluh kali bolak-balik terasa lama dan mudah ditinggalkan.
+ *
+ * Sekarang bot mengirim satu format, warga menyalinnya, melengkapi, lalu
+ * mengirim balik sekali jalan. Dua balasan bot saja untuk seluruh formulir -
+ * satu format, satu konfirmasi.
+ *
+ * Isian yang sudah benar DIINGAT. Kalau ada yang belum pas, warga cukup
+ * mengirim baris yang perlu diperbaiki saja, tidak perlu mengetik ulang
+ * semuanya.
  *
  * Validasi akhir sebelum simpan SELALU lewat skema Zod yang sama dengan
  * formulir web (src/lib/schemas/*) - satu sumber kebenaran aturan, berlaku
- * untuk kanal mana pun. Validasi per-langkah di berkas ini hanyalah
- * pemeriksaan dini supaya warga tahu lebih cepat kalau isiannya kurang pas,
- * bukan pengganti skema itu.
+ * untuk kanal mana pun.
  */
 
 export type JenisForm = "vidcon" | "pengaduan" | "data";
 
-export interface HasilLangkah {
-  ok: boolean;
-  nilai?: string;
-  pesan?: string;
-}
-
-export interface LangkahForm {
+export interface MedanForm {
+  /** Nama internal, dipakai submitForm. */
   field: string;
-  /** Boleh dilewati dengan salah satu KATA_LEWATI - dicek oleh mesinnya, bukan di sini. */
+  /** Label yang tampil di format dan dicocokkan saat menguraikan balasan. */
+  label: string;
   opsional?: boolean;
-  pertanyaan: (jawaban: Record<string, string>, contact: BeregamContact) => string;
   proses: (
     input: string,
     bersih: string,
@@ -45,8 +52,8 @@ export interface LangkahForm {
   ) => { ok: true; nilai: string } | { ok: false; pesan: string };
 }
 
-/** Kata yang menandakan warga melewati satu isian opsional. Dipakai juga oleh alur penilaian. */
-export const KATA_LEWATI = ["lewati", "skip", "nanti", "tidak", "gak", "engga", "enggak"];
+/** Kata yang menandakan warga melewati satu isian opsional. */
+export const KATA_LEWATI = ["lewati", "skip", "nanti", "tidak", "gak", "engga", "enggak", "-"];
 
 const NAMA_HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
@@ -64,33 +71,29 @@ export function deskripsiJamLayanan(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Validator per-langkah, dipakai ulang lintas formulir
+// Validator per isian
 // ---------------------------------------------------------------------------
 
-function teksMin(input: string, min: number, pesan: string): HasilLangkah & { ok: true; nilai: string } | { ok: false; pesan: string } {
+function teksMin(input: string, min: number, pesan: string) {
   const bersih = input.trim();
-  if (bersih.length < min) return { ok: false, pesan };
-  return { ok: true, nilai: bersih };
+  if (bersih.length < min) return { ok: false, pesan } as const;
+  return { ok: true, nilai: bersih } as const;
 }
 
 function validasiEmail(input: string) {
   const hasil = z.string().trim().toLowerCase().email().safeParse(input);
   return hasil.success
     ? ({ ok: true, nilai: hasil.data } as const)
-    : ({ ok: false, pesan: "Format email belum tepat. Contoh: nama@email.com. Coba ketik lagi." } as const);
+    : ({ ok: false, pesan: "format email belum tepat, contoh: nama@email.com" } as const);
 }
 
 function validasiNoHp(input: string, bersih: string, contact: BeregamContact) {
-  if (["sama", "ya", "iya", "sama saja", "pakai ini"].includes(bersih)) {
+  if (["sama", "ya", "iya", "sama saja", "pakai ini", "nomor ini"].includes(bersih)) {
     return { ok: true, nilai: contact.phone } as const;
   }
   const digitSaja = input.replace(/[^0-9]/g, "");
   if (digitSaja.length < 6) {
-    return {
-      ok: false,
-      pesan:
-        "Nomor HP/WA belum valid. Ketik *sama* untuk pakai nomor WhatsApp ini, atau ketik ulang nomornya.",
-    } as const;
+    return { ok: false, pesan: 'belum valid - tulis nomornya, atau isi "sama" untuk memakai nomor WhatsApp ini' } as const;
   }
   return { ok: true, nilai: input.trim() } as const;
 }
@@ -103,15 +106,11 @@ const NAMA_BULAN: Record<string, string> = {
 
 function selesaikanTanggal(iso: string) {
   const d = new Date(`${iso}T00:00:00Z`);
-  const invalid = Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso;
-  if (invalid) {
-    return { ok: false, pesan: "Tanggal tidak valid. Contoh: 25-08-2026." } as const;
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso) {
+    return { ok: false, pesan: "tanggalnya tidak ada di kalender, contoh: 25-08-2026" } as const;
   }
   if (iso < komponenWib().tanggalIso) {
-    return {
-      ok: false,
-      pesan: "Tanggalnya sudah lewat. Pilih tanggal hari ini atau setelahnya.",
-    } as const;
+    return { ok: false, pesan: "tanggalnya sudah lewat, pilih hari ini atau setelahnya" } as const;
   }
   return { ok: true, nilai: iso } as const;
 }
@@ -136,261 +135,271 @@ function validasiTanggal(input: string) {
     return selesaikanTanggal(iso);
   }
 
-  return { ok: false, pesan: "Format tanggal belum dikenali. Contoh: 25-08-2026." } as const;
+  return { ok: false, pesan: "format tanggal belum dikenali, contoh: 25-08-2026" } as const;
 }
 
 function validasiJam(input: string) {
   const bersih = input.trim().replace(",", ".");
   const cocok = bersih.match(/^(\d{1,2})[:.](\d{2})$/) ?? bersih.match(/^(\d{1,2})$/);
-  if (!cocok) {
-    return { ok: false, pesan: "Format jam belum dikenali. Contoh: 09:00." } as const;
-  }
+  if (!cocok) return { ok: false, pesan: "format jam belum dikenali, contoh: 09:00" } as const;
   const jam = Number(cocok[1]);
   const menit = cocok[2] ? Number(cocok[2]) : 0;
   if (jam < 0 || jam > 23 || menit < 0 || menit > 59) {
-    return { ok: false, pesan: "Jam tidak valid. Contoh: 09:00." } as const;
+    return { ok: false, pesan: "jamnya tidak valid, contoh: 09:00" } as const;
   }
   return { ok: true, nilai: `${String(jam).padStart(2, "0")}:${String(menit).padStart(2, "0")}` } as const;
 }
 
 const KATEGORI_ADUAN = [
-  { nilai: "Pelayanan PST", label: "Pelayanan Statistik Terpadu (PST)" },
-  { nilai: "Layanan ViDCon", label: "Layanan ViDCon Online" },
-  { nilai: "Publikasi & Data", label: "Kualitas Data & Publikasi" },
-  { nilai: "Sarana & Prasarana", label: "Fasilitas / Sarana Prasarana" },
-  { nilai: "Lainnya", label: "Pengaduan Lainnya" },
+  "Pelayanan PST",
+  "Layanan ViDCon",
+  "Publikasi & Data",
+  "Sarana & Prasarana",
+  "Lainnya",
 ] as const;
 
-function pertanyaanKategori(): string {
-  const baris = KATEGORI_ADUAN.map((k, i) => `${i + 1}. ${k.label}`).join("\n");
-  return `Kategori aduan/saran Anda? Balas dengan *angka*:\n\n${baris}`;
-}
-
-function validasiKategori(bersih: string) {
+/** Menerima angka pilihan, ATAU teks kategorinya langsung. */
+function validasiKategori(input: string, bersih: string) {
   const idx = Number(bersih) - 1;
-  if (!Number.isInteger(idx) || idx < 0 || idx >= KATEGORI_ADUAN.length) {
-    return {
-      ok: false,
-      pesan: `Balas dengan angka 1-${KATEGORI_ADUAN.length} sesuai daftar kategori di atas.`,
-    } as const;
+  if (Number.isInteger(idx) && idx >= 0 && idx < KATEGORI_ADUAN.length) {
+    return { ok: true, nilai: KATEGORI_ADUAN[idx] } as const;
   }
-  return { ok: true, nilai: KATEGORI_ADUAN[idx].nilai } as const;
+  const cocok = KATEGORI_ADUAN.find((k) => k.toLowerCase() === input.trim().toLowerCase());
+  if (cocok) return { ok: true, nilai: cocok } as const;
+  return { ok: false, pesan: `isi angka 1-${KATEGORI_ADUAN.length} sesuai daftar di format` } as const;
 }
 
-function validasiJenisKelamin(bersih: string) {
-  if (["l", "laki", "laki-laki", "pria"].includes(bersih)) {
-    return { ok: true, nilai: "Laki-laki" } as const;
-  }
-  if (["p", "perempuan", "wanita"].includes(bersih)) {
-    return { ok: true, nilai: "Perempuan" } as const;
-  }
-  return {
-    ok: false,
-    pesan: "Balas *L* untuk Laki-laki, *P* untuk Perempuan, atau *lewati*.",
-  } as const;
-}
+const FORMAT_PILIHAN: Record<string, string> = {
+  "1": "SOFT_FILE",
+  "2": "HARD_COPY",
+  "3": "KUNJUNGAN_LANGSUNG",
+};
 
-function pertanyaanFormatData(): string {
-  return (
-    "Format data yang diinginkan? Balas dengan *angka*:\n\n" +
-    "1. Berkas digital (soft file)\n2. Cetak (hard copy)\n3. Datang langsung ke kantor"
-  );
-}
-
-function validasiFormatData(bersih: string) {
-  const peta: Record<string, string> = { "1": "SOFT_FILE", "2": "HARD_COPY", "3": "KUNJUNGAN_LANGSUNG" };
-  const nilai = peta[bersih];
-  if (!nilai) {
-    return { ok: false, pesan: "Balas dengan angka 1, 2, atau 3 sesuai daftar di atas." } as const;
-  }
-  return { ok: true, nilai } as const;
+function validasiFormatData(input: string, bersih: string) {
+  const nilai = FORMAT_PILIHAN[bersih];
+  if (nilai) return { ok: true, nilai } as const;
+  const teks = input.trim().toLowerCase();
+  if (teks.includes("soft") || teks.includes("digital")) return { ok: true, nilai: "SOFT_FILE" } as const;
+  if (teks.includes("cetak") || teks.includes("hard")) return { ok: true, nilai: "HARD_COPY" } as const;
+  if (teks.includes("kantor") || teks.includes("langsung")) return { ok: true, nilai: "KUNJUNGAN_LANGSUNG" } as const;
+  return { ok: false, pesan: "isi angka 1, 2, atau 3 sesuai daftar di format" } as const;
 }
 
 // ---------------------------------------------------------------------------
-// Langkah per formulir
+// Susunan isian tiap formulir
+//
+// SATU sumber untuk dua hal sekaligus: teks format yang dikirim ke warga,
+// DAN pencocokan label saat menguraikan balasannya. Kalau keduanya ditulis
+// terpisah, cepat atau lambat labelnya bergeser dan balasan warga jadi tidak
+// terbaca tanpa ada yang menyadarinya.
 // ---------------------------------------------------------------------------
 
-export const FORM_STEPS: Record<JenisForm, LangkahForm[]> = {
+export const MEDAN_FORM: Record<JenisForm, MedanForm[]> = {
   vidcon: [
-    {
-      field: "nama",
-      pertanyaan: () => "Baik, siapa nama lengkap Anda?",
-      proses: (i) => teksMin(i, 2, "Nama minimal 2 karakter. Coba ketik lagi ya."),
-    },
-    {
-      field: "instansi",
-      pertanyaan: () => "Dari instansi/lembaga mana? (Boleh tulis *Pribadi* bila perorangan.)",
-      proses: (i) => teksMin(i, 2, "Mohon diisi minimal 2 karakter."),
-    },
-    {
-      field: "alamat",
-      pertanyaan: () => "Alamat lengkap Anda/instansi?",
-      proses: (i) => teksMin(i, 3, "Alamat minimal 3 karakter."),
-    },
-    {
-      field: "email",
-      pertanyaan: () => "Alamat email aktif, untuk kami kirimkan tautan ViDCon-nya?",
-      proses: (i) => validasiEmail(i),
-    },
-    {
-      field: "noHp",
-      pertanyaan: (_j, c) =>
-        `Nomor HP/WA aktif untuk dihubungi? Ketik *sama* untuk pakai nomor WhatsApp ini (+${c.phone}).`,
-      proses: (i, b, c) => validasiNoHp(i, b, c),
-    },
-    {
-      field: "topik",
-      pertanyaan: () =>
-        "Topik yang ingin dikonsultasikan? Contoh: PDRB, Inflasi, Kependudukan, Metodologi Survei, ROMANTIK.",
-      proses: (i) => teksMin(i, 2, "Sebutkan topiknya ya, minimal 2 karakter."),
-    },
-    {
-      field: "deskripsi",
-      pertanyaan: () => "Ceritakan singkat kebutuhan konsultasi Anda (minimal 10 karakter).",
-      proses: (i) => teksMin(i, 10, "Uraiannya masih terlalu singkat, minimal 10 karakter."),
-    },
-    {
-      field: "tanggal",
-      pertanyaan: () =>
-        `Tanggal yang diinginkan untuk konsultasi? Contoh: 25-08-2026.\nViDCon dilayani hari kerja (${deskripsiJamLayanan()}).`,
-      proses: (i) => validasiTanggal(i),
-    },
-    {
-      field: "jam",
-      pertanyaan: () => "Jam berapa (WIB)? Contoh: 09:00.",
-      proses: (i) => validasiJam(i),
-    },
+    { field: "nama", label: "Nama", proses: (i) => teksMin(i, 2, "minimal 2 karakter") },
+    { field: "instansi", label: "Instansi", proses: (i) => teksMin(i, 2, 'minimal 2 karakter, boleh diisi "Pribadi"') },
+    { field: "alamat", label: "Alamat", proses: (i) => teksMin(i, 3, "minimal 3 karakter") },
+    { field: "email", label: "Email", proses: (i) => validasiEmail(i) },
+    { field: "noHp", label: "No HP", proses: (i, b, c) => validasiNoHp(i, b, c) },
+    { field: "topik", label: "Topik", proses: (i) => teksMin(i, 2, "sebutkan topiknya, mis. PDRB atau Inflasi") },
+    { field: "deskripsi", label: "Kebutuhan", proses: (i) => teksMin(i, 10, "uraikan sedikit lebih panjang, minimal 10 karakter") },
+    { field: "tanggal", label: "Tanggal", proses: (i) => validasiTanggal(i) },
+    { field: "jam", label: "Jam", proses: (i) => validasiJam(i) },
     {
       field: "layananInklusifCatatan",
+      label: "Pendampingan",
       opsional: true,
-      pertanyaan: () =>
-        "Perlu pendampingan khusus (mis. juru bahasa isyarat, kursi roda, lansia)? " +
-        "Jelaskan singkat, atau ketik *tidak* bila tidak perlu.",
-      proses: (i) => teksMin(i, 1, "Jelaskan singkat kebutuhannya, atau ketik *tidak*."),
+      proses: (i) => teksMin(i, 1, 'jelaskan singkat, atau tulis "tidak"'),
     },
   ],
 
   pengaduan: [
-    {
-      field: "nama",
-      pertanyaan: () => "Baik, siapa nama Anda? (Boleh tulis *Anonim* bila tidak ingin disebutkan.)",
-      proses: (i) => teksMin(i, 2, "Nama minimal 2 karakter, atau tulis *Anonim*."),
-    },
-    {
-      field: "kategori",
-      pertanyaan: () => pertanyaanKategori(),
-      proses: (_i, b) => validasiKategori(b),
-    },
-    {
-      field: "detail",
-      pertanyaan: () => "Silakan tuliskan detail aduan atau saran Anda (minimal 15 karakter).",
-      proses: (i) => teksMin(i, 15, "Uraiannya masih terlalu singkat, minimal 15 karakter."),
-    },
-    {
-      field: "email",
-      pertanyaan: () => "Email aktif untuk kami hubungi terkait tindak lanjutnya?",
-      proses: (i) => validasiEmail(i),
-    },
-    {
-      field: "noHp",
-      opsional: true,
-      pertanyaan: (_j, c) =>
-        `Nomor HP/WA (opsional)? Ketik *sama* untuk pakai nomor WhatsApp ini (+${c.phone}), atau *lewati*.`,
-      proses: (i, b, c) => validasiNoHp(i, b, c),
-    },
-    {
-      field: "jenisKelamin",
-      opsional: true,
-      pertanyaan: () => "Jenis kelamin Anda (opsional)? Balas *L* untuk Laki-laki, *P* untuk Perempuan, atau *lewati*.",
-      proses: (_i, b) => validasiJenisKelamin(b),
-    },
-    {
-      field: "asalInstansi",
-      opsional: true,
-      pertanyaan: () => "Asal instansi/lembaga (opsional)? Ketik *lewati* bila tidak perlu.",
-      proses: (i) => teksMin(i, 1, "Mohon diisi, atau ketik *lewati*."),
-    },
+    { field: "nama", label: "Nama", proses: (i) => teksMin(i, 2, 'minimal 2 karakter, boleh diisi "Anonim"') },
+    { field: "kategori", label: "Kategori", proses: (i, b) => validasiKategori(i, b) },
+    { field: "detail", label: "Aduan", proses: (i) => teksMin(i, 15, "uraikan sedikit lebih panjang, minimal 15 karakter") },
+    { field: "email", label: "Email", proses: (i) => validasiEmail(i) },
+    { field: "noHp", label: "No HP", opsional: true, proses: (i, b, c) => validasiNoHp(i, b, c) },
   ],
 
   data: [
-    {
-      field: "nama",
-      pertanyaan: () => "Baik, siapa nama lengkap Anda?",
-      proses: (i) => teksMin(i, 2, "Nama minimal 2 karakter. Coba ketik lagi ya."),
-    },
-    {
-      field: "instansi",
-      pertanyaan: () => "Dari instansi/lembaga mana? (Boleh tulis *Pribadi* bila perorangan.)",
-      proses: (i) => teksMin(i, 2, "Mohon diisi minimal 2 karakter."),
-    },
-    {
-      field: "alamat",
-      pertanyaan: () => "Alamat lengkap Anda/instansi?",
-      proses: (i) => teksMin(i, 3, "Alamat minimal 3 karakter."),
-    },
-    {
-      field: "email",
-      pertanyaan: () => "Alamat email aktif untuk kami hubungi?",
-      proses: (i) => validasiEmail(i),
-    },
-    {
-      field: "noHp",
-      pertanyaan: (_j, c) =>
-        `Nomor HP/WA aktif? Ketik *sama* untuk pakai nomor WhatsApp ini (+${c.phone}).`,
-      proses: (i, b, c) => validasiNoHp(i, b, c),
-    },
-    {
-      field: "jenisData",
-      pertanyaan: () =>
-        "Data/tabel statistik apa yang Anda butuhkan? Contoh: Data PDRB per kecamatan 2023, jumlah penduduk per desa, data inflasi bulanan.",
-      proses: (i) => teksMin(i, 3, "Sebutkan data yang dibutuhkan, minimal 3 karakter."),
-    },
-    {
-      field: "keperluan",
-      pertanyaan: () =>
-        "Untuk keperluan apa data ini akan digunakan? Contoh: penelitian, dokumen perencanaan, tugas akhir.",
-      proses: (i) => teksMin(i, 5, "Uraiannya masih terlalu singkat, minimal 5 karakter."),
-    },
-    {
-      field: "formatDiinginkan",
-      pertanyaan: () => pertanyaanFormatData(),
-      proses: (_i, b) => validasiFormatData(b),
-    },
-    {
-      field: "catatan",
-      opsional: true,
-      pertanyaan: () => "Ada catatan tambahan? Tulis pesan Anda, atau ketik *lewati*.",
-      proses: (i) => teksMin(i, 1, "Tulis catatannya, atau ketik *lewati*."),
-    },
+    { field: "nama", label: "Nama", proses: (i) => teksMin(i, 2, "minimal 2 karakter") },
+    { field: "instansi", label: "Instansi", proses: (i) => teksMin(i, 2, 'minimal 2 karakter, boleh diisi "Pribadi"') },
+    { field: "alamat", label: "Alamat", proses: (i) => teksMin(i, 3, "minimal 3 karakter") },
+    { field: "email", label: "Email", proses: (i) => validasiEmail(i) },
+    { field: "noHp", label: "No HP", proses: (i, b, c) => validasiNoHp(i, b, c) },
+    { field: "jenisData", label: "Data diminta", proses: (i) => teksMin(i, 3, "sebutkan datanya, mis. PDRB per kecamatan 2023") },
+    { field: "keperluan", label: "Keperluan", proses: (i) => teksMin(i, 5, "uraikan sedikit lebih panjang, minimal 5 karakter") },
+    { field: "formatDiinginkan", label: "Format", proses: (i, b) => validasiFormatData(i, b) },
+    { field: "catatan", label: "Catatan", opsional: true, proses: (i) => teksMin(i, 1, 'tulis catatannya, atau "-"') },
   ],
 };
 
-/** Sapaan pembuka tiap formulir. Semuanya menyebut jalan keluar - tidak ada warga yang boleh merasa terjebak. */
-export const FORM_INTRO_BAWAAN: Record<JenisForm, string> = {
+/** Keterangan tambahan di bawah format, per jenis. */
+const PETUNJUK: Record<JenisForm, string> = {
   vidcon:
-    "💬 Yuk, kita isi formulir ViDCon (konsultasi statistik) bersama. Beberapa pertanyaan " +
-    "singkat, gratis. Ketik *batal* kapan saja untuk keluar.",
+    `_Tanggal contoh: 25-08-2026. Jam contoh: 09:00 (hari kerja ${"{jam_layanan}"})._\n` +
+    '_No HP: tulis "sama" untuk memakai nomor WhatsApp ini._\n' +
+    '_Pendampingan: isi bila perlu juru bahasa isyarat, kursi roda, atau pendampingan lansia. Kalau tidak perlu, tulis "tidak"._',
   pengaduan:
-    "📮 Baik, saya bantu catat aduan/saran Anda. Beberapa pertanyaan singkat ya. " +
-    "Ketik *batal* kapan saja untuk keluar.",
+    "_Kategori: 1=Pelayanan PST, 2=Layanan ViDCon, 3=Publikasi & Data, 4=Sarana & Prasarana, 5=Lainnya._\n" +
+    '_Nama boleh diisi "Anonim". No HP boleh dikosongkan dengan tanda "-"._',
   data:
-    "🗂️ Siap, kita ajukan permintaan data Anda ke petugas kami. Beberapa pertanyaan " +
-    "singkat dulu ya. Ketik *batal* kapan saja untuk keluar.",
+    "_Format: 1=Berkas digital, 2=Cetak, 3=Ambil langsung di kantor._\n" +
+    '_No HP: tulis "sama" untuk memakai nomor WhatsApp ini. Catatan boleh diisi "-"._',
 };
+
+const JUDUL: Record<JenisForm, string> = {
+  vidcon: "💬 *FORMULIR VIDCON - KONSULTASI STATISTIK*",
+  pengaduan: "📮 *FORMULIR ADUAN & SARAN*",
+  data: "🗂️ *FORMULIR PERMINTAAN DATA*",
+};
+
+/**
+ * Menyusun teks format yang dikirim ke warga.
+ *
+ * Barisnya sengaja polos "Label:" tanpa contoh menempel, supaya warga bisa
+ * menyalin seluruh pesan lalu mengetik di belakang titik dua tanpa perlu
+ * menghapus apa pun lebih dulu.
+ */
+export function teksFormat(jenis: JenisForm): string {
+  const baris = MEDAN_FORM[jenis]
+    .map((m) => `${m.label}:${m.opsional ? " -" : ""}`)
+    .join("\n");
+
+  return (
+    `${JUDUL[jenis]}\n\n` +
+    "Salin pesan ini, lengkapi setelah tanda titik dua, lalu kirim kembali " +
+    "dalam *satu* pesan.\n\n" +
+    `${baris}\n\n` +
+    `${PETUNJUK[jenis].replace("{jam_layanan}", deskripsiJamLayanan())}\n\n` +
+    "Ketik *batal* kapan saja untuk keluar."
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Menguraikan balasan warga
+// ---------------------------------------------------------------------------
+
+/** Membersihkan label: buang penebalan WhatsApp dan spasi berlebih. */
+function normalkanLabel(teks: string): string {
+  return teks.replace(/[*_~]/g, "").trim().toLowerCase();
+}
+
+/**
+ * Memisahkan pesan warga menjadi pasangan label -> isi.
+ *
+ * Baris yang TIDAK diawali label dikenal dianggap sambungan isi baris
+ * sebelumnya. Itu penting: uraian aduan dan keperluan data sering ditulis
+ * beberapa baris, dan memotongnya di baris pertama akan membuang sebagian
+ * besar penjelasan warga tanpa ada yang tahu.
+ */
+export function uraikanBalasan(jenis: JenisForm, teks: string): Record<string, string> {
+  const medanPerLabel = new Map(MEDAN_FORM[jenis].map((m) => [normalkanLabel(m.label), m]));
+  const hasil: Record<string, string> = {};
+  let medanAktif: MedanForm | null = null;
+
+  for (const barisMentah of teks.split("\n")) {
+    const baris = barisMentah.trim();
+    const posisi = baris.indexOf(":");
+
+    if (posisi > 0) {
+      const kandidat = medanPerLabel.get(normalkanLabel(baris.slice(0, posisi)));
+      if (kandidat) {
+        medanAktif = kandidat;
+        hasil[kandidat.field] = baris.slice(posisi + 1).trim();
+        continue;
+      }
+    }
+
+    if (medanAktif && baris) {
+      hasil[medanAktif.field] = `${hasil[medanAktif.field] ?? ""}\n${baris}`.trim();
+    }
+  }
+
+  return hasil;
+}
+
+export interface HasilPeriksa {
+  /** Isian yang sudah lolos validasi - digabung dengan yang tersimpan sebelumnya. */
+  jawaban: Record<string, string>;
+  /** Label + alasan untuk isian yang belum benar. Kosong berarti formulir lengkap. */
+  masalah: { label: string; pesan: string }[];
+  /** Ada label dikenal di pesan ini? False berarti warga membalas di luar format. */
+  adaLabelDikenali: boolean;
+}
+
+/**
+ * Menggabungkan balasan baru dengan isian yang sudah benar sebelumnya, lalu
+ * memeriksa mana yang masih kurang.
+ *
+ * Penggabungan inilah yang membuat warga tidak perlu mengetik ulang seluruh
+ * formulir hanya karena satu baris salah - cukup kirim baris itu saja.
+ */
+export function periksaForm(
+  jenis: JenisForm,
+  teks: string,
+  tersimpan: Record<string, string>,
+  contact: BeregamContact
+): HasilPeriksa {
+  const mentah = uraikanBalasan(jenis, teks);
+  const jawaban: Record<string, string> = { ...tersimpan };
+  const masalah: { label: string; pesan: string }[] = [];
+
+  for (const medan of MEDAN_FORM[jenis]) {
+    const punyaKiriman = Object.prototype.hasOwnProperty.call(mentah, medan.field);
+    const isi = (mentah[medan.field] ?? "").trim();
+    const bersih = isi.toLowerCase();
+
+    // Isian opsional yang dikosongkan atau ditandai lewat.
+    if (medan.opsional && punyaKiriman && (isi === "" || KATA_LEWATI.includes(bersih))) {
+      jawaban[medan.field] = "";
+      continue;
+    }
+
+    if (punyaKiriman && isi !== "") {
+      const hasil = medan.proses(isi, bersih, contact);
+      if (hasil.ok) {
+        jawaban[medan.field] = hasil.nilai;
+        continue;
+      }
+      masalah.push({ label: medan.label, pesan: hasil.pesan });
+      delete jawaban[medan.field];
+      continue;
+    }
+
+    // Tidak dikirim kali ini - pakai yang sudah tersimpan bila ada.
+    if (Object.prototype.hasOwnProperty.call(jawaban, medan.field)) continue;
+    if (medan.opsional) {
+      jawaban[medan.field] = "";
+      continue;
+    }
+    masalah.push({ label: medan.label, pesan: "belum diisi" });
+  }
+
+  return { jawaban, masalah, adaLabelDikenali: Object.keys(mentah).length > 0 };
+}
+
+/** Menyusun satu pesan berisi seluruh isian yang masih perlu diperbaiki. */
+export function pesanMasalah(masalah: { label: string; pesan: string }[]): string {
+  const daftar = masalah.map((m) => `• *${m.label}* - ${m.pesan}`).join("\n");
+  return (
+    `Sedikit lagi! Ada ${masalah.length} isian yang belum pas:\n\n` +
+    `${daftar}\n\n` +
+    "Kirim ulang baris yang perlu diperbaiki saja (isian lain sudah kami simpan), " +
+    "atau ketik *batal* untuk keluar."
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Penyimpanan akhir
 // ---------------------------------------------------------------------------
 
 /**
- * Menyimpan jawaban yang sudah lengkap ke tabel yang sama dengan formulir web.
+ * Menyimpan jawaban lengkap ke tabel yang sama dengan formulir web.
  *
- * Divalidasi ULANG lewat skema Zod domain masing-masing sebelum disimpan -
- * pemeriksaan per-langkah di atas hanya percepatan pengalaman warga, bukan
- * pengganti satu sumber kebenaran aturan bisnis. `.parse()` menerima
- * `unknown`, jadi memberi objek longgar di sini aman secara tipe; kalau
- * ada isian yang lolos validasi langkah tapi gagal di sini, errornya
- * dilempar ke pemanggil untuk ditangani sebagai kegagalan submit.
+ * Divalidasi ULANG lewat skema Zod domain masing-masing - pemeriksaan per
+ * isian di atas hanya percepatan pengalaman warga, bukan pengganti satu
+ * sumber kebenaran aturan bisnis.
  */
 export async function submitForm(
   jenis: JenisForm,
@@ -430,6 +439,20 @@ export async function submitForm(
       })
       .$returningId();
 
+    await beritahuPermohonanBaru({
+      jenis: "vidcon",
+      id: inserted.id,
+      nama: data.nama,
+      sumber: "WHATSAPP",
+      kontak: data.noHp,
+      baris: [
+        `Instansi: ${data.instansi}`,
+        `Topik: ${data.topik}`,
+        `Jadwal diminta: ${data.tanggal} pukul ${data.jam} WIB`,
+        data.layananInklusifCatatan ? `Perlu pendampingan: ${data.layananInklusifCatatan}` : "",
+      ],
+    });
+
     return {
       id: inserted.id,
       pesan:
@@ -445,8 +468,8 @@ export async function submitForm(
       nama: jawaban.nama,
       email: jawaban.email,
       noHp: jawaban.noHp || "",
-      jenisKelamin: jawaban.jenisKelamin || "",
-      asalInstansi: jawaban.asalInstansi || "",
+      jenisKelamin: "",
+      asalInstansi: "",
       kategori: jawaban.kategori,
       detail: jawaban.detail,
     });
@@ -457,14 +480,23 @@ export async function submitForm(
         nama: data.nama,
         email: data.email,
         noHp: data.noHp || null,
-        jenisKelamin: data.jenisKelamin || null,
-        asalInstansi: data.asalInstansi || null,
+        jenisKelamin: null,
+        asalInstansi: null,
         kategori: data.kategori,
         detail: data.detail,
         status: "PENDING",
         sumber: "WHATSAPP",
       })
       .$returningId();
+
+    await beritahuPermohonanBaru({
+      jenis: "pengaduan",
+      id: inserted.id,
+      nama: data.nama,
+      sumber: "WHATSAPP",
+      kontak: data.noHp || data.email,
+      baris: [`Kategori: ${data.kategori}`],
+    });
 
     return {
       id: inserted.id,
@@ -504,12 +536,27 @@ export async function submitForm(
     })
     .$returningId();
 
+  await beritahuPermohonanBaru({
+    jenis: "data",
+    id: inserted.id,
+    nama: data.nama,
+    sumber: "WHATSAPP",
+    kontak: data.noHp,
+    baris: [
+      `Instansi: ${data.instansi}`,
+      `Data diminta: ${data.jenisData}`,
+      `Keperluan: ${data.keperluan}`,
+    ],
+  });
+
   return {
     id: inserted.id,
     pesan:
       `✅ *Permintaan data Anda sudah kami terima* (tiket #${inserted.id}).\n\n` +
       `Data: ${data.jenisData}\n\n` +
       "Tim Pelayanan Statistik Terpadu akan memproses dan menghubungi Anda lewat " +
-      "email/nomor yang didaftarkan.",
+      "email/nomor yang didaftarkan.\n\n" +
+      "_Perlu melampirkan berkas pendukung (contoh format tabel, surat pengantar)? " +
+      "Ajukan lewat web: https://bpskabmusirawas.com_",
   };
 }

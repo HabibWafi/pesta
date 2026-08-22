@@ -15,19 +15,21 @@ import {
 import {
   ambilAtauBuatSesi,
   ambilHealth,
-  findOrCreateContactByWaId,
   hitungBalasanSemenit,
   hitungKirimHariIni,
 } from "../db/queries";
 import { getConfig } from "../config";
 import { getGateway } from "../drivers";
 import { ambilPesan } from "../pesan";
+import { kirimNotifikasiPetugas } from "../notifikasi";
 import {
   deskripsiJamLayanan,
-  FORM_INTRO_BAWAAN,
-  FORM_STEPS,
   KATA_LEWATI,
+  MEDAN_FORM,
+  pesanMasalah,
+  periksaForm,
   submitForm,
+  teksFormat,
   type JenisForm,
 } from "../forms";
 import { formatWib, komponenWib, samarkanNomor, tambahMenit } from "@/lib/waktu";
@@ -190,11 +192,14 @@ export class BeregamService {
     // --- LANGKAH 7c: mengisi formulir layanan -------------------------------
     //
     // Sama seperti LANGKAH 7b: diperiksa SEBELUM pagar kedaluwarsa. Formulir
-    // ViDCon punya sampai 10 langkah - warga wajar butuh waktu lebih lama
-    // dari 30 menit di antara satu-dua langkah, apalagi kalau harus mencari
-    // alamat email atau memikirkan uraian keperluannya.
+    // ViDCon punya sepuluh isian - menyalin format, melengkapinya, lalu
+    // mengirim balik wajar memakan waktu lebih dari 30 menit, apalagi bila
+    // warga perlu mencari alamat email atau memikirkan uraian keperluannya.
+    // Kalau pagar kedaluwarsa diperiksa lebih dulu, formulir yang sudah
+    // susah payah diketik akan disambut sapaan "halo, selamat datang" dan
+    // seluruh isinya hilang.
     if (sesi.state === STATE_FORM) {
-      await this.lanjutkanForm(contact, sesi, teks.trim(), bersih);
+      await this.lanjutkanForm(contact, sesi, teks.trim());
       return;
     }
 
@@ -546,7 +551,13 @@ export class BeregamService {
   // Formulir layanan langsung di chat (ViDCon, pengaduan, permintaan data)
   // =========================================================================
 
-  /** Membuka formulir: kirim sapaan lalu pertanyaan pertama, simpan langkah=0 di context. */
+  /**
+   * Membuka formulir: kirim SATU pesan berisi formatnya, lalu tunggu.
+   *
+   * Sapaan dan format digabung jadi satu pesan, bukan dua. Tiap balasan bot
+   * memakan jatah pembatas laju, dan jatah itu jauh lebih berguna disimpan
+   * untuk membantu warga memperbaiki isian yang keliru nanti.
+   */
   private async mulaiForm(
     contact: BeregamContact,
     sesi: BeregamSession,
@@ -558,118 +569,106 @@ export class BeregamService {
       .update(beregamSessions)
       .set({
         state: STATE_FORM,
-        context: { form: jenis, langkah: 0, jawaban: {} },
+        context: { form: jenis, jawaban: {} },
         missCount: 0,
         lastActivityAt: sekarang,
         expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),
       })
       .where(eq(beregamSessions.id, sesi.id));
 
-    await this.balas(contact, introKustom || FORM_INTRO_BAWAAN[jenis], "bot");
-
-    const langkahPertama = FORM_STEPS[jenis][0];
-    await this.gateway.queueText(
-      contact.id,
-      contact.waId,
-      langkahPertama.pertanyaan({}, contact),
-      { source: "bot", delaySeconds: 3 }
-    );
+    const format = teksFormat(jenis);
+    await this.balas(contact, introKustom ? `${introKustom}\n\n${format}` : format, "bot");
   }
 
   /**
-   * Menerima satu jawaban langkah formulir yang sedang berjalan.
+   * Menerima formulir yang sudah diisi warga - seluruhnya dalam satu pesan.
    *
-   * Setiap langkah gagal SELALU menyebutkan jalan keluar (*batal*) di
-   * pesan error - warga tidak boleh merasa terjebak menjawab satu
-   * pertanyaan berulang-ulang tanpa tahu caranya berhenti. Kata kunci
-   * global (menu/batal/petugas) tetap diperiksa lebih dulu di
-   * handleIncoming, jadi tetap berfungsi membatalkan formulir kapan saja.
+   * Isian yang sudah benar DIINGAT di context, jadi kalau ada yang keliru
+   * warga cukup mengirim baris itu saja. Mengetik ulang sepuluh baris hanya
+   * karena satu tanggal salah format adalah cara tercepat membuat orang
+   * menyerah di tengah jalan.
+   *
+   * Kata kunci global (menu/batal/petugas) diperiksa lebih dulu di
+   * handleIncoming, jadi jalan keluarnya selalu tersedia.
    */
   private async lanjutkanForm(
     contact: BeregamContact,
     sesi: BeregamSession,
-    teks: string,
-    bersih: string
+    teks: string
   ): Promise<void> {
     const konteks = (sesi.context ?? {}) as {
       form?: JenisForm;
-      langkah?: number;
       jawaban?: Record<string, string>;
     };
     const jenis = konteks.form;
 
     // Context rusak atau hilang (mis. sesi dibuat ulang manual) - jangan
     // biarkan warga macet, kembalikan saja ke menu.
-    if (!jenis || !FORM_STEPS[jenis]) {
+    if (!jenis || !MEDAN_FORM[jenis]) {
       await this.kirimMenuUtama(contact, { ...sesi, state: "main_menu" }, { sapa: false });
       return;
     }
 
-    const langkahIdx = konteks.langkah ?? 0;
-    const jawabanSejauhIni = konteks.jawaban ?? {};
-    const langkah = FORM_STEPS[jenis][langkahIdx];
-    const lewati = Boolean(langkah.opsional) && KATA_LEWATI.includes(bersih);
-
-    let nilai = "";
-    if (!lewati) {
-      const hasil = langkah.proses(teks, bersih, contact);
-      if (!hasil.ok) {
-        await this.balas(
-          contact,
-          `${hasil.pesan}\n\nKetik *batal* untuk keluar dari formulir ini.`,
-          "bot"
-        );
-        await this.sentuhSesi(sesi.id);
-        return;
-      }
-      nilai = hasil.nilai;
-    }
-
-    const jawabanBaru = { ...jawabanSejauhIni, [langkah.field]: nilai };
-    const langkahBerikutnya = langkahIdx + 1;
+    const tersimpan = konteks.jawaban ?? {};
+    const { jawaban, masalah, adaLabelDikenali } = periksaForm(jenis, teks, tersimpan, contact);
     const sekarang = new Date();
 
-    if (langkahBerikutnya >= FORM_STEPS[jenis].length) {
-      try {
-        const { id, pesan } = await submitForm(jenis, jawabanBaru);
-        await this.balas(contact, pesan, "bot");
-        console.info(
-          `[beregam] formulir ${jenis} #${id} dari kontak=${samarkanNomor(contact.phone)}`
-        );
-      } catch (error) {
-        console.error(`[beregam] gagal menyimpan formulir ${jenis}:`, error);
-        await this.balas(
-          contact,
-          "Mohon maaf, terjadi kendala teknis saat menyimpan formulir Anda. " +
-            "Silakan coba lagi beberapa saat, atau ketik *petugas* untuk dibantu langsung.",
-          "bot"
-        );
-      }
+    // Balasan yang sama sekali tidak memakai format - kemungkinan besar warga
+    // mengetik bebas karena belum paham. Kirim ulang formatnya sekali, jangan
+    // memarahi.
+    if (!adaLabelDikenali) {
+      await this.balas(
+        contact,
+        "Sepertinya formulirnya belum terisi sesuai format 🙏\n\n" +
+          "Salin pesan format di bawah ini, lengkapi setelah tanda titik dua, lalu kirim " +
+          "kembali dalam satu pesan.\n\n" +
+          `${teksFormat(jenis)}`,
+        "bot"
+      );
+      await this.sentuhSesi(sesi.id);
+      return;
+    }
 
+    if (masalah.length > 0) {
       await db
         .update(beregamSessions)
         .set({
-          state: "main_menu",
-          context: null,
-          missCount: 0,
+          context: { form: jenis, jawaban },
           lastActivityAt: sekarang,
           expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),
         })
         .where(eq(beregamSessions.id, sesi.id));
+
+      await this.balas(contact, pesanMasalah(masalah), "bot");
       return;
+    }
+
+    try {
+      const { id, pesan } = await submitForm(jenis, jawaban);
+      await this.balas(contact, pesan, "bot");
+      console.info(
+        `[beregam] formulir ${jenis} #${id} dari kontak=${samarkanNomor(contact.phone)}`
+      );
+    } catch (error) {
+      console.error(`[beregam] gagal menyimpan formulir ${jenis}:`, error);
+      await this.balas(
+        contact,
+        "Mohon maaf, terjadi kendala teknis saat menyimpan formulir Anda. " +
+          "Silakan coba lagi beberapa saat, atau ketik *petugas* untuk dibantu langsung.",
+        "bot"
+      );
     }
 
     await db
       .update(beregamSessions)
       .set({
-        context: { form: jenis, langkah: langkahBerikutnya, jawaban: jawabanBaru },
+        state: "main_menu",
+        context: null,
+        missCount: 0,
         lastActivityAt: sekarang,
         expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),
       })
       .where(eq(beregamSessions.id, sesi.id));
-
-    const pertanyaanBerikutnya = FORM_STEPS[jenis][langkahBerikutnya].pertanyaan(jawabanBaru, contact);
-    await this.balas(contact, pertanyaanBerikutnya, "bot");
   }
 
   // =========================================================================
@@ -845,20 +844,7 @@ export class BeregamService {
    * berfungsi tanpa nomor ini, hanya notifikasinya yang tidak terkirim.
    */
   private async notifyStaff(teks: string): Promise<void> {
-    const nomor = getConfig().staffWaNumber;
-    if (!nomor) {
-      console.warn(
-        "[beregam] BEREGAM_STAFF_WA belum diisi - notifikasi petugas dilewati"
-      );
-      return;
-    }
-
-    try {
-      const staf = await findOrCreateContactByWaId(`${nomor}@c.us`, "Petugas PST (notifikasi)");
-      await this.gateway.queueText(staf.id, staf.waId, teks, { source: "bot" });
-    } catch (error) {
-      console.error("[beregam] gagal mengirim notifikasi ke petugas:", error);
-    }
+    await kirimNotifikasiPetugas(teks);
   }
 
   /** Menandai handover terbuka agar muncul sebagai belum dibaca di inbox. */

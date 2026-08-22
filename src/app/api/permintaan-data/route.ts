@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { permintaanData } from "@/lib/db/schema";
 import { lampiranValid, permintaanDataSchema } from "@/lib/schemas/permintaan-data";
+import { beritahuPermohonanBaru } from "@/lib/beregam/notifikasi";
 import * as z from "zod";
 
 export async function POST(req: Request) {
@@ -87,6 +88,20 @@ export async function POST(req: Request) {
       .from(permintaanData)
       .where(eq(permintaanData.id, inserted.id))
       .limit(1);
+
+    await beritahuPermohonanBaru({
+      jenis: "data",
+      id: inserted.id,
+      nama: data.nama,
+      sumber: "WEB",
+      kontak: data.noHp,
+      baris: [
+        `Instansi: ${data.instansi}`,
+        `Data diminta: ${data.jenisData}`,
+        `Keperluan: ${data.keperluan}`,
+        lampiranNama ? `Ada lampiran: ${lampiranNama}` : "",
+      ],
+    });
 
     return NextResponse.json(
       {

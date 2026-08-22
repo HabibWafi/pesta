@@ -442,190 +442,299 @@ async function main() {
   await webhook(pesanWa("lewati"));
   await jeda(500);
 
-  // === O. Formulir layanan lewat chat =====================================
-  console.log("\nO. FORMULIR LAYANAN LEWAT CHAT");
+  // === O. Formulir layanan lewat chat (SATU pesan) ========================
+  //
+  // Sengaja SATU pesan, bukan tanya-jawab bertahap. Alur bertahap membuat
+  // bot membalas sepuluh kali untuk satu formulir, dan itu menabrak pembatas
+  // laju - bot lalu mendadak diam persis saat warga sedang serius mengisi.
+  console.log("\nO. FORMULIR LAYANAN LEWAT CHAT (SATU PESAN)");
 
-  // Menu 2/3/7 memicu formulir hanya kalau sesi sedang di main_menu -
-  // dipastikan lebih dulu, tidak bergantung pada state sisa bagian lain.
   sql(`UPDATE pesta.beregam_sessions SET state='main_menu', mode='bot', context=NULL WHERE contact_id=${kontakId};`);
   const nomorPolos = sql(`SELECT phone FROM pesta.beregam_contacts WHERE id=${kontakId};`);
 
-  // --- ViDCon (menu 3), jalur lengkap dengan shortcut 'sama' untuk noHp ---
+  // --- ViDCon (menu 3): format dulu, lalu satu pesan berisi seluruh isian --
+  const keluarSebelumFormat = Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId};`));
   await webhook(pesanWa("3"));
-  await jeda(400);
+  await jeda(500);
+
   lapor(
     "menu 3 membuka formulir ViDCon",
     sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "filling_form"
   );
+  lapor(
+    "  formatnya dikirim dalam SATU pesan saja (hemat jatah pembatas laju)",
+    Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId};`)) === keluarSebelumFormat + 1
+  );
+  lapor(
+    "  format memuat seluruh label isian",
+    (() => {
+      const t = sql(`SELECT payload FROM pesta.beregam_outbox WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`);
+      return ["Nama:", "Instansi:", "Alamat:", "Email:", "No HP:", "Topik:", "Kebutuhan:", "Tanggal:", "Jam:", "Pendampingan:"]
+        .every((l) => t.includes(l));
+    })()
+  );
 
-  await webhook(pesanWa("Warga Uji ViDCon WA"));
-  await jeda(300);
-  await webhook(pesanWa("Universitas Uji"));
-  await jeda(300);
-  await webhook(pesanWa("Jl. Uji No. 1, Musi Rawas"));
-  await jeda(300);
-  await webhook(pesanWa("warga.uji.vidcon@email.com"));
-  await jeda(300);
-  await webhook(pesanWa("sama"));
-  await jeda(300);
-  await webhook(pesanWa("PDRB dan Inflasi"));
-  await jeda(300);
-  await webhook(pesanWa("Saya ingin berkonsultasi soal data PDRB triwulanan."));
-  await jeda(300);
-  await webhook(pesanWa("01-09-2026"));
-  await jeda(300);
-  await webhook(pesanWa("09:00"));
-  await jeda(300);
-  await webhook(pesanWa("tidak"));
-  await jeda(600);
+  // Satu pesan berisi semuanya. "sama" memakai nomor WA pengirim, dan uraian
+  // Kebutuhan sengaja ditulis dua baris untuk menguji sambungan antarbaris.
+  await webhook(pesanWa(
+    "Nama: Warga Uji ViDCon WA\n" +
+    "Instansi: Universitas Uji\n" +
+    "Alamat: Jl. Uji No. 1, Musi Rawas\n" +
+    "Email: warga.uji.vidcon@email.com\n" +
+    "No HP: sama\n" +
+    "Topik: PDRB dan Inflasi\n" +
+    "Kebutuhan: Saya ingin berkonsultasi soal data PDRB triwulanan.\n" +
+    "Terutama sektor pertanian tahun 2023.\n" +
+    "Tanggal: 01-09-2026\n" +
+    "Jam: 09:00\n" +
+    "Pendampingan: tidak"
+  ));
+  await jeda(700);
 
   const vidId = sql(`SELECT id FROM pesta.vidcon_requests WHERE nama='Warga Uji ViDCon WA' ORDER BY id DESC LIMIT 1;`);
-  lapor("ViDCon via WA tersimpan ke tabel yang sama dengan formulir web", vidId !== "");
+  lapor("ViDCon terkirim lewat SATU pesan, masuk ke tabel yang sama dengan web", vidId !== "");
   lapor("  sumber tercatat WHATSAPP", sql(`SELECT sumber FROM pesta.vidcon_requests WHERE id=${vidId};`) === "WHATSAPP");
   lapor(
-    "  noHp terisi dari nomor WA lewat shortcut 'sama'",
+    "  'sama' memakai nomor WhatsApp pengirim",
     sql(`SELECT no_hp FROM pesta.vidcon_requests WHERE id=${vidId};`) === nomorPolos
   );
   lapor(
-    "  tanggal & jam tersimpan sesuai format DD-MM-YYYY yang diketik",
+    "  tanggal & jam terbaca dari format DD-MM-YYYY",
     sql(`SELECT CONCAT(tanggal,'|',jam) FROM pesta.vidcon_requests WHERE id=${vidId};`) === "2026-09-01|09:00"
   );
   lapor(
-    "  pendampingan inklusif kosong saat dijawab 'tidak'",
+    "  uraian multi-baris TIDAK terpotong di baris pertama",
+    sql(`SELECT deskripsi FROM pesta.vidcon_requests WHERE id=${vidId};`).includes("sektor pertanian")
+  );
+  lapor(
+    "  'tidak' pada isian opsional = dikosongkan",
     sql(`SELECT IFNULL(layanan_inklusif,'null') FROM pesta.vidcon_requests WHERE id=${vidId};`) === "null"
   );
   lapor(
-    "  sesi kembali ke main_menu setelah formulir selesai",
+    "  sesi kembali normal setelah formulir tersimpan",
     sql(`SELECT CONCAT(state,'|',IFNULL(context,'null')) FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "main_menu|null"
   );
 
-  // --- 'batal' di tengah formulir tidak menyimpan apa pun -----------------
+  // --- Isian keliru: dilaporkan sekaligus, dan yang benar TETAP diingat ----
   await webhook(pesanWa("3"));
-  await jeda(300);
-  await webhook(pesanWa("Warga Uji ViDCon Batal"));
-  await jeda(300);
+  await jeda(400);
+  await webhook(pesanWa(
+    "Nama: Warga Uji ViDCon Ralat\n" +
+    "Instansi: Pribadi\n" +
+    "Alamat: Jl. Ralat\n" +
+    "Email: bukan-email\n" +
+    "No HP: sama\n" +
+    "Topik: Inflasi\n" +
+    "Kebutuhan: Ingin memahami penghitungan inflasi bulanan.\n" +
+    "Tanggal: 32-13-2026\n" +
+    "Jam: 09:00\n" +
+    "Pendampingan: tidak"
+  ));
+  await jeda(700);
+
+  const pesanRalat = sql(`SELECT payload FROM pesta.beregam_outbox WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`);
   lapor(
-    "formulir di tengah jalan: langkah bertambah di context",
-    sql(`SELECT JSON_EXTRACT(context, '$.langkah') FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "1"
+    "dua isian keliru dilaporkan SEKALIGUS dalam satu pesan",
+    pesanRalat.includes("Email") && pesanRalat.includes("Tanggal") && pesanRalat.includes("2 isian")
+  );
+  lapor(
+    "  belum tersimpan selama masih ada yang keliru",
+    Number(sql(`SELECT COUNT(*) FROM pesta.vidcon_requests WHERE nama='Warga Uji ViDCon Ralat';`)) === 0
+  );
+  lapor(
+    "  isian yang sudah benar TETAP diingat (tidak perlu ketik ulang semua)",
+    sql(`SELECT context FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`).includes("Warga Uji ViDCon Ralat")
+  );
+
+  // Cukup kirim dua baris yang salah saja - sisanya dipakai dari ingatan.
+  await webhook(pesanWa("Email: ralat.uji@email.com\nTanggal: 02-09-2026"));
+  await jeda(700);
+
+  const ralatId = sql(`SELECT id FROM pesta.vidcon_requests WHERE nama='Warga Uji ViDCon Ralat' ORDER BY id DESC LIMIT 1;`);
+  lapor("mengirim HANYA baris yang diralat sudah cukup untuk menyelesaikan formulir", ralatId !== "");
+  lapor(
+    "  isian lama ikut tersimpan utuh",
+    sql(`SELECT CONCAT(email,'|',tanggal,'|',cakupan) FROM pesta.vidcon_requests WHERE id=${ralatId};`) === "ralat.uji@email.com|2026-09-02|Inflasi"
+  );
+
+  // --- Balasan di luar format: dikirimi format lagi, TIDAK dimarahi -------
+  await webhook(pesanWa("3"));
+  await jeda(400);
+  await webhook(pesanWa("halo pak saya mau konsultasi"));
+  await jeda(600);
+  lapor(
+    "balasan bebas tanpa format dibalas dengan formatnya lagi",
+    sql(`SELECT payload FROM pesta.beregam_outbox WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`).includes("Nama:")
+  );
+  lapor(
+    "  sesi tetap di formulir, warga tidak dilempar keluar",
+    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "filling_form"
   );
 
   await webhook(pesanWa("batal"));
-  await jeda(300);
-  lapor(
-    "'batal' menghentikan formulir tanpa menyimpan data",
-    Number(sql(`SELECT COUNT(*) FROM pesta.vidcon_requests WHERE nama='Warga Uji ViDCon Batal';`)) === 0 &&
-      sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "main_menu"
-  );
-
-  // --- Pengaduan (menu 7), kategori bernomor + field opsional dilewati ----
-  await webhook(pesanWa("7"));
   await jeda(400);
   lapor(
-    "menu 7 membuka formulir pengaduan",
-    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "filling_form"
-  );
-
-  await webhook(pesanWa("Warga Uji Aduan WA"));
-  await jeda(300);
-  await webhook(pesanWa("3")); // kategori nomor 3 -> "Publikasi & Data"
-  await jeda(300);
-  await webhook(pesanWa("Data yang diunggah di website sering tidak sesuai format terbaru."));
-  await jeda(300);
-  await webhook(pesanWa("aduan.uji@email.com"));
-  await jeda(300);
-  await webhook(pesanWa("lewati")); // noHp
-  await jeda(300);
-  await webhook(pesanWa("lewati")); // jenisKelamin
-  await jeda(300);
-  await webhook(pesanWa("lewati")); // asalInstansi
-  await jeda(600);
-
-  const aduId = sql(`SELECT id FROM pesta.pengaduans WHERE nama='Warga Uji Aduan WA' ORDER BY id DESC LIMIT 1;`);
-  lapor("Pengaduan via WA tersimpan ke tabel yang sama dengan formulir web", aduId !== "");
-  lapor("  sumber tercatat WHATSAPP", sql(`SELECT sumber FROM pesta.pengaduans WHERE id=${aduId};`) === "WHATSAPP");
-  lapor(
-    "  kategori terpetakan dari pilihan angka",
-    sql(`SELECT kategori FROM pesta.pengaduans WHERE id=${aduId};`) === "Publikasi & Data"
-  );
-  lapor(
-    "  tiga field opsional yang dilewati tersimpan NULL, bukan string kosong",
-    sql(`SELECT CONCAT(IFNULL(no_hp,'null'),'|',IFNULL(jenis_kelamin,'null'),'|',IFNULL(asal_instansi,'null')) FROM pesta.pengaduans WHERE id=${aduId};`) === "null|null|null"
-  );
-
-  // --- Permintaan data (menu 2), format bernomor + noHp eksplisit ---------
-  await webhook(pesanWa("2"));
-  await jeda(400);
-  lapor(
-    "menu 2 membuka formulir permintaan data",
-    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "filling_form"
-  );
-
-  await webhook(pesanWa("Warga Uji Data WA"));
-  await jeda(300);
-  await webhook(pesanWa("Bappeda Musi Rawas"));
-  await jeda(300);
-  await webhook(pesanWa("Jl. Data No. 2, Musi Rawas"));
-  await jeda(300);
-  await webhook(pesanWa("data.uji@email.com"));
-  await jeda(300);
-  await webhook(pesanWa("081234500000")); // noHp eksplisit, bukan shortcut 'sama'
-  await jeda(300);
-  await webhook(pesanWa("Data PDRB per kecamatan tahun 2023"));
-  await jeda(300);
-  await webhook(pesanWa("Untuk penyusunan dokumen perencanaan daerah"));
-  await jeda(300);
-  await webhook(pesanWa("2")); // format nomor 2 -> HARD_COPY
-  await jeda(300);
-  await webhook(pesanWa("lewati")); // catatan
-  await jeda(600);
-
-  const dataId = sql(`SELECT id FROM pesta.permintaan_data WHERE nama='Warga Uji Data WA' ORDER BY id DESC LIMIT 1;`);
-  lapor("Permintaan data via WA tersimpan (fitur baru, sebelumnya cuma tautan)", dataId !== "");
-  lapor("  sumber tercatat WHATSAPP", sql(`SELECT sumber FROM pesta.permintaan_data WHERE id=${dataId};`) === "WHATSAPP");
-  lapor(
-    "  noHp eksplisit tersimpan apa adanya (bukan nomor WA pengirim)",
-    sql(`SELECT no_hp FROM pesta.permintaan_data WHERE id=${dataId};`) === "081234500000"
-  );
-  lapor(
-    "  format data terpetakan dari pilihan angka 2 -> HARD_COPY",
-    sql(`SELECT format_diinginkan FROM pesta.permintaan_data WHERE id=${dataId};`) === "HARD_COPY"
-  );
-  lapor(
-    "  catatan kosong saat dilewati",
-    sql(`SELECT IFNULL(catatan,'null') FROM pesta.permintaan_data WHERE id=${dataId};`) === "null"
-  );
-  lapor(
-    "  sesi kembali normal setelah formulir ketiga",
+    "'batal' selalu berfungsi - warga tidak pernah terjebak",
     sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "main_menu"
   );
 
-  // --- Isian tidak valid: diminta ulang, TIDAK maju, TIDAK pernah macet ---
-  await webhook(pesanWa("2"));
-  await jeda(300);
-  await webhook(pesanWa("Warga Uji Data Invalid"));
-  await jeda(300);
-  await webhook(pesanWa("Pribadi"));
-  await jeda(300);
-  await webhook(pesanWa("Jl. Invalid"));
-  await jeda(300);
-  await webhook(pesanWa("bukan-email-yang-valid"));
-  await jeda(300);
+  // --- Pengaduan (menu 7): kategori bernomor, isian opsional dikosongkan --
+  await webhook(pesanWa("7"));
+  await jeda(400);
+  await webhook(pesanWa(
+    "Nama: Warga Uji Aduan WA\n" +
+    "Kategori: 3\n" +
+    "Aduan: Data yang diunggah di website sering tidak sesuai format terbaru.\n" +
+    "Email: aduan.uji@email.com\n" +
+    "No HP: -"
+  ));
+  await jeda(700);
+
+  const aduId = sql(`SELECT id FROM pesta.pengaduans WHERE nama='Warga Uji Aduan WA' ORDER BY id DESC LIMIT 1;`);
+  lapor("Pengaduan terkirim lewat SATU pesan", aduId !== "");
+  lapor("  sumber tercatat WHATSAPP", sql(`SELECT sumber FROM pesta.pengaduans WHERE id=${aduId};`) === "WHATSAPP");
   lapor(
-    "email tidak valid: langkah TIDAK maju",
-    sql(`SELECT JSON_EXTRACT(context, '$.langkah') FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "3"
+    "  kategori angka 3 terpetakan ke 'Publikasi & Data'",
+    sql(`SELECT kategori FROM pesta.pengaduans WHERE id=${aduId};`) === "Publikasi & Data"
   );
   lapor(
-    "  sesi tetap di formulir, bukan dilempar keluar",
-    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "filling_form"
+    "  No HP '-' tersimpan NULL, bukan teks '-'",
+    sql(`SELECT IFNULL(no_hp,'null') FROM pesta.pengaduans WHERE id=${aduId};`) === "null"
   );
 
-  await webhook(pesanWa("batal"));
-  await jeda(300);
+  // --- Permintaan data (menu 2) -------------------------------------------
+  await webhook(pesanWa("2"));
+  await jeda(400);
+  await webhook(pesanWa(
+    "Nama: Warga Uji Data WA\n" +
+    "Instansi: Bappeda Musi Rawas\n" +
+    "Alamat: Jl. Data No. 2, Musi Rawas\n" +
+    "Email: data.uji@email.com\n" +
+    "No HP: 081234500000\n" +
+    "Data diminta: Data PDRB per kecamatan tahun 2023\n" +
+    "Keperluan: Untuk penyusunan dokumen perencanaan daerah\n" +
+    "Format: 2\n" +
+    "Catatan: -"
+  ));
+  await jeda(700);
+
+  const dataId = sql(`SELECT id FROM pesta.permintaan_data WHERE nama='Warga Uji Data WA' ORDER BY id DESC LIMIT 1;`);
+  lapor("Permintaan data terkirim lewat SATU pesan", dataId !== "");
+  lapor("  sumber tercatat WHATSAPP", sql(`SELECT sumber FROM pesta.permintaan_data WHERE id=${dataId};`) === "WHATSAPP");
   lapor(
-    "  'batal' tetap berfungsi meski sedang di tengah galat validasi - warga tidak pernah terjebak",
-    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "main_menu" &&
-      Number(sql(`SELECT COUNT(*) FROM pesta.permintaan_data WHERE nama='Warga Uji Data Invalid';`)) === 0
+    "  nomor yang ditulis sendiri dipakai apa adanya (bukan nomor pengirim)",
+    sql(`SELECT no_hp FROM pesta.permintaan_data WHERE id=${dataId};`) === "081234500000"
   );
+  lapor(
+    "  Format angka 2 terpetakan ke HARD_COPY",
+    sql(`SELECT format_diinginkan FROM pesta.permintaan_data WHERE id=${dataId};`) === "HARD_COPY"
+  );
+  lapor(
+    "  catatan '-' tersimpan NULL",
+    sql(`SELECT IFNULL(catatan,'null') FROM pesta.permintaan_data WHERE id=${dataId};`) === "null"
+  );
+
+  // --- Pagar utama: SATU formulir penuh = 2 balasan bot, bukan 10 ---------
+  //
+  // Inilah alasan alur bertahap ditinggalkan, dan ukuran yang harus dijaga
+  // supaya tidak diam-diam kembali mahal. Dihitung dari baris OUTBOX, bukan
+  // beregam_messages: baris pesan keluar baru ditulis saat worker meng-ack
+  // pengiriman, dan di uji ini tidak ada worker yang berjalan - menghitung
+  // dari sana akan selalu menghasilkan angka nol yang menipu.
+  sql(`UPDATE pesta.beregam_sessions SET state='main_menu', mode='bot', context=NULL WHERE contact_id=${kontakId};`);
+  const outboxSebelumAlur = Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId};`));
+
+  await webhook(pesanWa("2"));
+  await jeda(400);
+  await webhook(pesanWa(
+    "Nama: Warga Uji Data Hemat\n" +
+    "Instansi: Pribadi\n" +
+    "Alamat: Jl. Hemat\n" +
+    "Email: hemat.uji@email.com\n" +
+    "No HP: sama\n" +
+    "Data diminta: Jumlah penduduk per desa 2023\n" +
+    "Keperluan: Bahan penelitian skripsi\n" +
+    "Format: 1\n" +
+    "Catatan: -"
+  ));
+  await jeda(700);
+
+  const balasanSatuFormulir =
+    Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId};`)) - outboxSebelumAlur;
+
+  lapor(
+    "satu formulir penuh hanya butuh 2 balasan bot (format + konfirmasi)",
+    balasanSatuFormulir === 2,
+    `${balasanSatuFormulir} balasan`
+  );
+  lapor(
+    "  jauh di bawah pembatas laju, jadi bot tidak akan mendadak diam di tengah formulir",
+    balasanSatuFormulir < 10
+  );
+  lapor(
+    "  dan formulirnya benar-benar tersimpan",
+    Number(sql(`SELECT COUNT(*) FROM pesta.permintaan_data WHERE nama='Warga Uji Data Hemat';`)) === 1
+  );
+
+  // === P. Notifikasi permohonan baru ke WA petugas =========================
+  //
+  // Petugas tidak duduk memantau panel sepanjang hari. Tanpa pemberitahuan,
+  // permohonan bisa mengendap berjam-jam tanpa ada yang tahu - dan warga
+  // sudah telanjur diberi tahu bahwa permohonannya diterima.
+  console.log("\nP. NOTIFIKASI PERMOHONAN BARU KE WA PETUGAS");
+
+  if (!env.BEREGAM_STAFF_WA) {
+    lapor("BEREGAM_STAFF_WA belum diisi - bagian ini dilewati", true);
+  } else {
+    const nomorStaf2 = env.BEREGAM_STAFF_WA.replace(/[^0-9]/g, "");
+    const notifStaf = (pola) =>
+      Number(sql(
+        `SELECT COUNT(*) FROM pesta.beregam_outbox o JOIN pesta.beregam_contacts c ON c.id=o.contact_id ` +
+        `WHERE c.phone='${nomorStaf2}' AND o.payload LIKE '%${pola}%';`
+      ));
+
+    // Permohonan lewat WhatsApp (dari bagian O di atas).
+    lapor("permohonan ViDCon dari WhatsApp memberi tahu petugas", notifStaf("Permohonan ViDCon baru") > 0);
+    lapor("aduan dari WhatsApp memberi tahu petugas", notifStaf("Aduan / saran baru") > 0);
+    lapor("permintaan data dari WhatsApp memberi tahu petugas", notifStaf("Permintaan data baru") > 0);
+    lapor(
+      "  notifikasinya mengarahkan petugas ke panel PESTA, bukan membalas dari chat",
+      notifStaf("bpskabmusirawas.com/admin") > 0
+    );
+    lapor(
+      "  menyebut asal permohonan supaya petugas tahu warga bisa dibalas lewat mana",
+      notifStaf("WhatsApp Beregam") > 0
+    );
+
+    // Permohonan lewat FORMULIR WEB - jalur yang sama sekali berbeda, tapi
+    // petugas harus sama-sama diberi tahu.
+    const sebelumWeb = notifStaf("Formulir web PESTA");
+    const resWeb = await fetch(`${B}/api/permintaan-data`, {
+      method: "POST",
+      body: (() => {
+        const f = new FormData();
+        f.append("nama", "Warga Uji Data Web Notif");
+        f.append("instansi", "Pribadi");
+        f.append("alamat", "Jl. Web");
+        f.append("noHp", "081234500009");
+        f.append("email", "web.notif@email.com");
+        f.append("jenisData", "Data uji notifikasi web");
+        f.append("keperluan", "Memastikan petugas diberi tahu");
+        f.append("formatDiinginkan", "SOFT_FILE");
+        return f;
+      })(),
+    });
+    await jeda(600);
+
+    lapor("formulir web tersimpan", resWeb.status === 201);
+    lapor(
+      "permohonan dari FORMULIR WEB juga memberi tahu petugas",
+      notifStaf("Formulir web PESTA") > sebelumWeb
+    );
+
+    sql(`DELETE FROM pesta.permintaan_data WHERE nama='Warga Uji Data Web Notif';`);
+    sql(`DELETE FROM pesta.beregam_contacts WHERE phone='${nomorStaf2}';`);
+  }
 
   // === Bersihkan ==========================================================
   bersihkan();

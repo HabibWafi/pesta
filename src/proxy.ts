@@ -49,5 +49,21 @@ export default function proxy(req: NextRequest) {
     return NextResponse.redirect(tujuan);
   }
 
+  /*
+   * Sudah login dan membuka /admin - langsung antar ke dashboard dari sini.
+   *
+   * Dulu pengalihan ini dikerjakan di browser (halaman /admin memanggil
+   * /api/auth/me lalu router.replace). Akibatnya browser harus mengambil
+   * berkas JavaScript halaman dashboard lebih dulu, dan sesaat setelah
+   * deploy berkas itu bisa saja sudah dihapus - petugas melihat layar galat
+   * alih-alih panelnya. Di sini sesinya sudah diverifikasi, jadi tujuannya
+   * sudah pasti dan tidak ada alasan menunda keputusan itu sampai ke browser.
+   */
+  if (pathname === "/admin") {
+    const tujuan = req.nextUrl.clone();
+    tujuan.pathname = "/admin/dashboard";
+    return NextResponse.redirect(tujuan);
+  }
+
   return NextResponse.next();
 }
