@@ -879,6 +879,61 @@ async function main() {
     sql(`DELETE FROM pesta.beregam_contacts WHERE phone='${nomorStaf2}';`);
   }
 
+  // === S. Menu 4 & 5 terhubung ke sumber resmi BPS ========================
+  //
+  // Sebelumnya kedua menu ini membalas dengan penanda "[ISI: sebutkan
+  // publikasi unggulan...]" - catatan untuk petugas yang tidak pernah
+  // dilengkapi, dan warga sungguhan membacanya. Yang dijaga di sini bukan
+  // sekadar "ada jawaban", melainkan bahwa TIDAK ADA penanda internal apa
+  // pun yang pernah sampai ke warga, dalam keadaan apa pun - termasuk saat
+  // Web API BPS tidak bisa dihubungi.
+  console.log("\nS. MENU 4 & 5 TERHUBUNG KE SUMBER RESMI BPS");
+
+  sql(`UPDATE pesta.beregam_sessions SET state='main_menu', mode='bot', context=NULL WHERE contact_id=${kontakId};`);
+
+  const balasanMenu = async (angka) => {
+    await webhook(pesanWa(angka));
+    await jeda(900);
+    return sql(
+      `SELECT payload FROM pesta.beregam_outbox WHERE contact_id=${kontakId} AND type='text' ORDER BY id DESC LIMIT 2;`
+    );
+  };
+
+  const m4 = await balasanMenu("4");
+  lapor("menu 4 menjawab publikasi", m4.includes("ublikasi"));
+  lapor(
+    "  TIDAK ada penanda [ISI: ...] yang bocor ke warga",
+    !m4.includes("[ISI:") && !m4.includes("ISI:")
+  );
+  lapor("  TIDAK ada penanda [BPS:...] yang bocor ke warga", !m4.includes("[BPS:"));
+  lapor(
+    "  menyertakan tautan resmi BPS Musi Rawas",
+    m4.includes("musirawaskab.bps.go.id")
+  );
+
+  sql(`UPDATE pesta.beregam_sessions SET state='main_menu' WHERE contact_id=${kontakId};`);
+  const m5 = await balasanMenu("5");
+  lapor("menu 5 menjawab tabel/indikator statistik", m5.includes("abel") || m5.includes("ndikator"));
+  lapor(
+    "  TIDAK ada penanda [ISI: ...] yang bocor ke warga",
+    !m5.includes("[ISI:") && !m5.includes("ISI:")
+  );
+  lapor("  TIDAK ada penanda [BPS:...] yang bocor ke warga", !m5.includes("[BPS:"));
+  lapor(
+    "  mengarahkan ke menu 2 untuk data yang belum tersedia",
+    m5.includes("Permintaan Data") || m5.includes("menu *2*")
+  );
+
+  // Pagar menyeluruh: tidak ada satu pun jawaban menu yang menyisakan
+  // penanda internal. Menangkap penanda baru yang lupa ditangani kode.
+  const semuaJawabanMenu = sql(
+    `SELECT GROUP_CONCAT(payload SEPARATOR ' || ') FROM pesta.beregam_outbox WHERE contact_id=${kontakId};`
+  );
+  lapor(
+    "seluruh jawaban yang pernah dikirim bebas dari penanda internal",
+    !/\[(ISI|BPS|FORM|ESKALASI)[:\]]/.test(semuaJawabanMenu)
+  );
+
   // === Bersihkan ==========================================================
   bersihkan();
   console.log("\nData uji dibersihkan.");

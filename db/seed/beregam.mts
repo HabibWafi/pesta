@@ -47,24 +47,15 @@ const MENU = [
   {
     menuKey: "4",
     title: "Publikasi & rilis terbaru",
-    answer:
-      "📚 Seluruh publikasi dan Berita Resmi Statistik BPS Kabupaten Musi Rawas " +
-      "dapat diunduh gratis di:\n" +
-      "https://musirawaskab.bps.go.id\n\n" +
-      "[ISI: sebutkan publikasi unggulan dan jadwal rilis rutin]",
+    // Diambil langsung dari Web API resmi BPS - lihat src/lib/beregam/bps-api.ts.
+    // Bila API tidak bisa dihubungi, jawabannya otomatis jatuh ke tautan resmi
+    // berikut penjelasannya, bukan pesan galat.
+    answer: "[BPS:publikasi]",
   },
   {
     menuKey: "5",
     title: "Tabel & indikator statistik",
-    answer:
-      "📈 *Tabel & Indikator Statistik*\n\n" +
-      "Ringkasan indikator utama Kabupaten Musi Rawas (jumlah penduduk, " +
-      "inflasi, PDRB, kemiskinan, dan lainnya) tersedia lewat:\n\n" +
-      "[ISI: sebutkan tautan tabel/dashboard indikator resmi, mis. " +
-      "https://musirawaskab.bps.go.id/id/statistics-table atau portal Satu Data]\n\n" +
-      "Untuk data yang lebih rinci atau belum tersedia di publikasi, silakan " +
-      "ajukan lewat menu *2* (Permintaan Data), atau ketik *8* untuk bicara " +
-      "langsung dengan petugas kami.",
+    answer: "[BPS:tabel]",
   },
   {
     menuKey: "6",

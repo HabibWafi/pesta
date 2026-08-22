@@ -22,6 +22,7 @@ import { getConfig } from "../config";
 import { getGateway } from "../drivers";
 import { ambilPesan } from "../pesan";
 import { kirimNotifikasiPetugas } from "../notifikasi";
+import { pesanPublikasi, pesanTabelStatistik } from "../bps-pesan";
 import {
   deskripsiJamLayanan,
   KATA_LEWATI,
@@ -363,6 +364,31 @@ export class BeregamService {
       const jenis = cocokForm[1] as JenisForm;
       const introKustom = cocokForm[2].trim();
       await this.mulaiForm(contact, sesi, jenis, introKustom || undefined);
+      return true;
+    }
+
+    /*
+     * Menu yang isinya diambil langsung dari Web API resmi BPS - publikasi
+     * terbaru dan tabel statistik. Pola penandanya sama dengan [ESKALASI]
+     * dan [FORM:...] di atas, jadi admin bisa memindah atau menonaktifkan
+     * menunya dari panel tanpa menyentuh kode.
+     *
+     * pesanPublikasi()/pesanTabelStatistik() SELALU mengembalikan jawaban
+     * yang berguna - kalau API tidak bisa dihubungi, yang dikirim tautan
+     * resmi berikut penjelasannya. Jadi tidak perlu cabang kegagalan di sini.
+     */
+    const cocokBps = entri.answer.trim().match(/^\[BPS:(publikasi|tabel)\]/);
+    if (cocokBps) {
+      const isi =
+        cocokBps[1] === "publikasi" ? await pesanPublikasi() : await pesanTabelStatistik();
+      await this.balas(contact, isi, "faq");
+      await this.gateway.queueText(
+        contact.id,
+        contact.waId,
+        await ambilPesan("menu_footer_jawaban"),
+        { source: "bot", delaySeconds: 4 }
+      );
+      await this.sentuhSesi(sesi.id);
       return true;
     }
 
