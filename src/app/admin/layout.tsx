@@ -21,7 +21,8 @@ import {
   Moon,
   Settings2,
   BarChart3,
-  ShieldCheck
+  ShieldCheck,
+  Bot
 } from "lucide-react";
 import { toast } from "sonner";
 import LonengNotifikasi from "@/components/admin/LonengNotifikasi";
@@ -107,6 +108,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Pesan Kontak PST", href: "/admin/contact", icon: Mail },
     { name: "Statistik Pengunjung", href: "/admin/analytics", icon: BarChart3 },
     { name: "Kelola Konten", href: "/admin/konten", icon: Settings2 },
+    { name: "Bot WhatsApp Beregam", href: "/admin/beregam", icon: Bot },
     { name: "Akun Administrator", href: "/admin/users", icon: ShieldCheck },
   ];
 

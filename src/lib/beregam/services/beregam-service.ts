@@ -14,12 +14,13 @@ import {
 import {
   ambilAtauBuatSesi,
   ambilHealth,
+  findOrCreateContactByWaId,
   hitungBalasanSemenit,
   hitungKirimHariIni,
 } from "../db/queries";
 import { getConfig } from "../config";
 import { getGateway } from "../drivers";
-import { komponenWib, samarkanNomor, tambahMenit } from "@/lib/waktu";
+import { formatWib, komponenWib, samarkanNomor, tambahMenit } from "@/lib/waktu";
 
 /**
  * Mesin state percakapan Beregam.
@@ -36,10 +37,30 @@ const KATA_MENU = ["menu", "0", "batal", "kembali", "mulai"];
 const KATA_PETUGAS = ["petugas", "admin", "manusia", "operator", "cs"];
 const KATA_BERHENTI = ["stop", "berhenti", "unsubscribe", "hapus saya"];
 
+/** Sesi menunggu warga menuliskan keperluannya (eskalasi di luar jam kerja). */
+const STATE_MENUNGGU_KONTEKS = "awaiting_escalation_reason";
+
+const NAMA_HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
+/** Menyusun teks jam layanan dari konfigurasi, bukan ditulis tetap di tiga tempat. */
+function deskripsiJamLayanan(): string {
+  const { hariKerja, jamBuka, jamTutup } = getConfig().jamLayanan;
+  const urut = [...hariKerja].sort((a, b) => a - b);
+  const berurutan =
+    urut.length > 1 && urut.every((h, i) => i === 0 || h === urut[i - 1] + 1);
+  const hari = berurutan
+    ? `${NAMA_HARI[urut[0]]}-${NAMA_HARI[urut[urut.length - 1]]}`
+    : urut.map((h) => NAMA_HARI[h]).join(", ");
+  const jam = (j: number) => `${String(j).padStart(2, "0")}.00`;
+  return `${hari}, ${jam(jamBuka)}-${jam(jamTutup)} WIB`;
+}
+
 const SAPAAN =
-  "Halo! 👋 Saya *Beregam*, asisten layanan BPS Kabupaten Musi Rawas.\n\n" +
-  "Ini balasan otomatis. Petugas kami melayani pada hari dan jam kerja.\n" +
-  "Percakapan ini disimpan untuk keperluan layanan.";
+  "Halo, selamat datang! 👋\n" +
+  "Saya *Beregam*, asisten virtual Pelayanan Statistik Terpadu BPS Kabupaten Musi Rawas.\n\n" +
+  "Saya balasan otomatis, siap membantu kapan saja. Untuk mengobrol langsung, " +
+  "petugas kami hadir di hari dan jam kerja.\n" +
+  "Percakapan ini kami simpan untuk keperluan layanan.";
 
 export class BeregamService {
   private gateway = getGateway();
@@ -105,9 +126,9 @@ export class BeregamService {
         .where(eq(beregamContacts.id, contact.id));
       await this.balas(
         contact,
-        "Baik, kami berhenti mengirim balasan otomatis ke nomor ini.\n\n" +
+        "Baik, kami hentikan balasan otomatis ke nomor ini ya. 👍\n\n" +
           "Anda tetap bisa menghubungi Pelayanan Statistik Terpadu BPS " +
-          "Kabupaten Musi Rawas lewat telepon atau datang langsung.",
+          "Kabupaten Musi Rawas lewat telepon atau datang langsung kapan saja.",
         "bot"
       );
       return;
@@ -141,6 +162,23 @@ export class BeregamService {
 
     if (KATA_MENU.includes(bersih)) {
       await this.kirimMenuUtama(contact, sesi, { sapa: false });
+      return;
+    }
+
+    // --- LANGKAH 7b: menunggu keterangan eskalasi di luar jam kerja ---------
+    //
+    // Dipasang escalate() saat warga minta bicara petugas di luar jam kerja.
+    // Pesan APA PUN yang masuk di sini diperlakukan sebagai keterangan
+    // keperluan mereka - bukan dicocokkan ke menu.
+    //
+    // SENGAJA diperiksa SEBELUM pagar kedaluwarsa (LANGKAH 8) di bawah.
+    // sessionTtlMinutes hanya 30 menit, dan warga wajar butuh waktu lebih
+    // lama untuk mengetik keperluannya. Kalau pagar kedaluwarsa diperiksa
+    // lebih dulu, keterangan yang telat sedikit saja akan disambut sapaan
+    // "halo, selamat datang" alih-alih diterima sebagai jawaban - dan
+    // keperluan yang sudah susah payah diketik warga hilang begitu saja.
+    if (sesi.state === STATE_MENUNGGU_KONTEKS) {
+      await this.terimaKonteksEskalasi(contact, sesi, teks.trim());
       return;
     }
 
@@ -234,13 +272,13 @@ export class BeregamService {
 
     const baris = pilihan.map((m) => `${m.menuKey}. ${m.title}`);
     const header = opsi.sapa
-      ? `${SAPAAN}\n\nSilakan balas dengan *angka*:`
-      : "Silakan balas dengan *angka*:";
+      ? `${SAPAAN}\n\nSilakan pilih salah satu, cukup balas dengan *angka* ya:`
+      : "Mau lihat apa lagi? Balas dengan *angka* ya:";
 
     await this.gateway.queueMenu(contact.id, contact.waId, header, [
       ...baris,
       "",
-      "Ketik *menu* kapan saja untuk kembali ke sini.",
+      "Ketik *menu* kapan saja untuk kembali ke daftar ini.",
     ], { source: "bot" });
 
     const sekarang = new Date();
@@ -282,7 +320,8 @@ export class BeregamService {
     await this.gateway.queueText(
       contact.id,
       contact.waId,
-      "Ketik *menu* untuk melihat pilihan lain, atau *petugas* untuk bicara dengan staf kami.",
+      "Ada yang bisa dibantu lagi? Ketik *menu* untuk pilihan lainnya, atau " +
+        "*petugas* kalau ingin ngobrol langsung dengan staf kami. 😊",
       { source: "bot", delaySeconds: 4 }
     );
 
@@ -308,9 +347,9 @@ export class BeregamService {
 
     await this.balas(
       contact,
-      "Maaf, saya belum paham maksud Anda. 🙏\n\n" +
-        "Ketik *menu* untuk melihat pilihan layanan, atau *petugas* untuk " +
-        "bicara langsung dengan staf kami.",
+      "Waduh, sepertinya saya belum menangkap maksud Anda. 🙏\n\n" +
+        "Coba ketik *menu* untuk melihat pilihan layanan, atau *petugas* " +
+        "kalau ingin langsung terhubung dengan staf kami.",
       "bot"
     );
 
@@ -323,11 +362,25 @@ export class BeregamService {
   }
 
   /**
-   * Melempar percakapan ke inbox petugas.
+   * Melempar percakapan ke petugas.
    *
-   * Sekaligus menyetel mode manual, sehingga bot langsung diam. Hanya
-   * petugas yang bisa melepasnya kembali - warga yang mengetik "menu" saat
-   * mode manual TIDAK mengubah apa pun.
+   * DUA JALUR BERBEDA, tergantung jam kerja - ini yang memperbaiki keluhan
+   * warga "macet" setelah minta bicara petugas di luar jam layanan.
+   *
+   * SEBELUMNYA: mode langsung dikunci "manual" tidak peduli jam berapa.
+   * Itu benar SELAMA petugas memang akan segera membaca - dalam jam kerja
+   * itu wajar. Di luar jam kerja, tidak ada yang akan membaca sampai besok,
+   * tapi bot tetap terkunci diam sampai `manualModeTimeoutMinutes` (bawaan
+   * 2 jam) habis. Warga yang mencoba lagi menit berikutnya menemukan bot
+   * seolah mati - padahal itu justru mekanisme anti-balasan-dobel yang
+   * bekerja sesuai rancangan, hanya saja diterapkan di waktu yang salah.
+   *
+   * SEKARANG, di luar jam kerja: mode TETAP "bot" (tidak dikunci). Warga
+   * diminta menuliskan keperluannya, itu ditampung sebagai keterangan
+   * handover, lalu bot kembali normal - bisa dipakai lagi seketika. Aman
+   * dari balasan dobel karena mekanisme J1/J3 di webhook (lihat "fromMe")
+   * berjalan independen: begitu petugas benar-benar membalas dari HP,
+   * sesi otomatis terkunci manual saat itu juga, bukan lebih awal.
    */
   async escalate(contact: BeregamContact, alasan: string): Promise<void> {
     const [terbuka] = await db
@@ -347,26 +400,153 @@ export class BeregamService {
       });
     }
 
+    const diLuarJam = !(await this.isJamLayanan());
+    const nomor = `+${contact.phone}`;
+    const waktu = formatWib(new Date());
+
+    if (diLuarJam) {
+      const sekarang = new Date();
+      await db
+        .update(beregamSessions)
+        .set({ state: STATE_MENUNGGU_KONTEKS, lastActivityAt: sekarang })
+        .where(eq(beregamSessions.contactId, contact.id));
+
+      await this.notifyStaff(
+        `🔔 *Permintaan bicara dengan petugas* (di luar jam layanan)\n\n` +
+          `Nomor: ${nomor}\nWaktu: ${waktu} WIB\nAlasan awal: ${alasan}\n\n` +
+          "Pengunjung sedang diminta menuliskan keperluannya. Notifikasi " +
+          "susulan menyusul begitu mereka membalas."
+      );
+
+      await this.balas(
+        contact,
+        `Saat ini di luar jam layanan kami (${deskripsiJamLayanan()}). 🕗\n\n` +
+          "Boleh ceritakan singkat apa yang ingin Anda tanyakan atau perlukan? " +
+          "Supaya begitu jam kerja mulai, petugas kami bisa langsung memahami " +
+          "dan merespons lebih cepat.\n\n" +
+          "Tenang, pesan Anda tetap kami sampaikan ke petugas sekarang juga " +
+          "kok, walau sedang di luar jam layanan. 🙏",
+        "bot"
+      );
+
+      console.info(
+        `[beregam] eskalasi (luar jam) kontak=${samarkanNomor(contact.phone)} alasan="${alasan}"`
+      );
+      return;
+    }
+
+    // --- Dalam jam kerja: alur semula - kunci manual, staf memang segera baca ---
     await db
       .update(beregamSessions)
       .set({ mode: "manual", state: "manual", lastActivityAt: new Date() })
       .where(eq(beregamSessions.contactId, contact.id));
 
-    const diLuarJam = !(await this.isJamLayanan());
-    const catatan = diLuarJam
-      ? "\n\nSaat ini di luar jam layanan. Petugas akan membalas pada hari kerja berikutnya."
-      : "";
+    await this.notifyStaff(
+      `🔔 *Permintaan bicara dengan petugas*\n\n` +
+        `Nomor: ${nomor}\nWaktu: ${waktu} WIB\nAlasan: ${alasan}\n\n` +
+        "Silakan buka WhatsApp Beregam untuk membalas warga tersebut."
+    );
 
     await this.balas(
       contact,
-      `Baik, saya sambungkan ke petugas Pelayanan Statistik Terpadu.${catatan}\n\n` +
-        "Mohon tunggu, pesan Anda sudah masuk ke antrean petugas.",
+      "Siap! Saya sambungkan Anda ke petugas Pelayanan Statistik Terpadu ya. 🙋\n\n" +
+        "Mohon tunggu sebentar, pesan Anda sudah masuk ke antrean dan " +
+        "petugas akan segera membalas.",
       "bot"
     );
 
     console.info(
       `[beregam] eskalasi kontak=${samarkanNomor(contact.phone)} alasan="${alasan}"`
     );
+  }
+
+  /**
+   * Menampung keterangan yang dituliskan warga saat eskalasi di luar jam
+   * kerja, lalu mengembalikan bot ke keadaan normal.
+   *
+   * Dipanggil dari LANGKAH 7b handleIncoming, untuk sesi berstatus
+   * STATE_MENUNGGU_KONTEKS.
+   */
+  private async terimaKonteksEskalasi(
+    contact: BeregamContact,
+    sesi: BeregamSession,
+    keterangan: string
+  ): Promise<void> {
+    if (!keterangan) {
+      // Pesan tanpa teks yang lolos sampai sini (mis. cuma emoji yang
+      // terbuang saat normalisasi) - diminta lagi, bukan diperlakukan
+      // sebagai keterangan kosong yang tidak berguna bagi petugas.
+      await this.balas(
+        contact,
+        "Boleh dituliskan dalam beberapa kata saja ya, secukupnya. 🙏",
+        "bot"
+      );
+      return;
+    }
+
+    await db
+      .update(beregamHandovers)
+      .set({ reason: keterangan.slice(0, 150) })
+      .where(
+        and(eq(beregamHandovers.contactId, contact.id), eq(beregamHandovers.status, "open"))
+      );
+
+    await this.notifyStaff(
+      `📝 *Keterangan dari pengunjung* (di luar jam layanan)\n\n` +
+        `Nomor: +${contact.phone}\nPesan: "${keterangan.slice(0, 300)}"\n\n` +
+        "Balas langsung dari WhatsApp Beregam kalau dirasa penting, atau " +
+        "tunggu sampai jam kerja berikutnya."
+    );
+
+    await this.balas(
+      contact,
+      "Terima kasih, sudah kami sampaikan ke petugas ya. ✅\n\n" +
+        `Kami akan menghubungi Anda kembali begitu jam layanan dimulai (${deskripsiJamLayanan()}). ` +
+        "Kalau ada hal yang mendesak, petugas kami tetap dapat memantau pesan ini.\n\n" +
+        "Ketik *menu* kapan saja bila ingin melihat layanan lain sementara menunggu. 😊",
+      "bot"
+    );
+
+    const sekarang = new Date();
+    await db
+      .update(beregamSessions)
+      .set({
+        state: "main_menu",
+        missCount: 0,
+        lastActivityAt: sekarang,
+        expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),
+      })
+      .where(eq(beregamSessions.id, sesi.id));
+  }
+
+  /**
+   * Mengirim notifikasi ke WA petugas piket (BEREGAM_STAFF_WA).
+   *
+   * Nomor petugas sengaja BERBEDA dari nomor bot (6285169881015). Notifikasi
+   * ini murni pemberitahuan "ada yang perlu ditindaklanjuti" - petugas
+   * tetap membalas WARGA dari HP yang memegang nomor bot, bukan dari nomor
+   * penerima notifikasi ini. Membalas dari nomor yang salah membuat
+   * balasannya tidak tercatat sebagai `agent_phone` dan warga menerima
+   * pesan dari nomor asing yang tidak mereka kenal.
+   *
+   * Gagal diam-diam bila BEREGAM_STAFF_WA belum diisi - modul tetap
+   * berfungsi tanpa nomor ini, hanya notifikasinya yang tidak terkirim.
+   */
+  private async notifyStaff(teks: string): Promise<void> {
+    const nomor = getConfig().staffWaNumber;
+    if (!nomor) {
+      console.warn(
+        "[beregam] BEREGAM_STAFF_WA belum diisi - notifikasi petugas dilewati"
+      );
+      return;
+    }
+
+    try {
+      const staf = await findOrCreateContactByWaId(`${nomor}@c.us`, "Petugas PST (notifikasi)");
+      await this.gateway.queueText(staf.id, staf.waId, teks, { source: "bot" });
+    } catch (error) {
+      console.error("[beregam] gagal mengirim notifikasi ke petugas:", error);
+    }
   }
 
   /** Menandai handover terbuka agar muncul sebagai belum dibaca di inbox. */
@@ -439,11 +619,9 @@ export class BeregamService {
 
     await this.balas(
       contact,
-      `Terima kasih, tetapi saya hanya bisa membaca pesan *teks* dan belum ` +
-        `dapat memproses ${sebutan}. 🙏
-
-` +
-        "Silakan tuliskan pertanyaan Anda, ketik *menu* untuk melihat pilihan " +
+      `Terima kasih sudah mengirim ${sebutan} 🙏, tapi saat ini saya baru bisa ` +
+        `membaca pesan *teks* saja.\n\n` +
+        "Coba tuliskan pertanyaan Anda ya, ketik *menu* untuk melihat pilihan " +
         "layanan, atau *petugas* untuk bicara langsung dengan staf kami.",
       "bot"
     );

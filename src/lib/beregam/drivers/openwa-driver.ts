@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { beregamOutbox, type BeregamOutbox } from "../db/schema";
 import { tambahDetik } from "@/lib/waktu";
-import { jedaAcakDetik } from "../config";
 import type { BeregamGateway, OpsiKirim } from "./gateway";
 
 /**
@@ -54,9 +53,21 @@ export class OpenWaDriver implements BeregamGateway {
     payload: Record<string, unknown>,
     opts: OpsiKirim
   ): Promise<BeregamOutbox> {
-    // Jeda acak dihitung di sini supaya seluruh sistem memakai aturan yang
-    // sama, dan worker tidak perlu tahu kebijakannya.
-    const jeda = opts.delaySeconds ?? jedaAcakDetik();
+    // TIDAK memakai jedaAcakDetik() sebagai bawaan.
+    //
+    // Sempat begitu, dan efeknya dobel: baris ini menunda kapan pesan
+    // BOLEH diambil worker (scheduledAt), lalu worker sendiri menunda LAGI
+    // sebelum benar-benar mengirim - sendSeen, "sedang mengetik", baru
+    // sendText (lihat worker/src/index.ts). Jeda pertama tidak menunjukkan
+    // indikator apa pun ke warga; ia cuma waktu kosong yang menambah beban
+    // di atas jeda kedua yang sudah meniru manusia mengetik.
+    //
+    // Bawaan sekarang 0 - pesan langsung boleh diambil worker begitu
+    // tersimpan. Jeda "terasa manusiawi" tetap utuh, dikerjakan worker.
+    // `delaySeconds` tetap ada untuk kebutuhan berbeda: MENGURUTKAN dua
+    // pesan berturut-turut (lihat jawabMenu di beregam-service.ts, yang
+    // sengaja memberi delaySeconds=4 pada pesan kedua).
+    const jeda = opts.delaySeconds ?? 0;
 
     const [dibuat] = await db
       .insert(beregamOutbox)

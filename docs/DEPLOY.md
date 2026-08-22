@@ -78,6 +78,11 @@ disengaja: kode bot boleh ter-deploy lebih dulu tanpa menyalakan apa pun, dan
 halaman publik sama sekali tidak terpengaruh. Isi variabelnya nanti, saat
 worker di PC kantor sudah siap disambungkan.
 
+Satu variabel tambahan, opsional: `BEREGAM_STAFF_WA` - nomor WA petugas
+(angka saja, mis. `6285707473757`) yang menerima notifikasi tiap kali ada
+warga minta bicara dengan petugas. Kosong berarti notifikasi ini dilewati
+saja; sisa modul tetap berjalan normal.
+
 > **Jangan membuat berkas `.env.production` di server.** Next.js memuatnya
 > dengan prioritas lebih tinggi daripada `.env`, dan pernah menyebabkan
 > koneksi database tertimpa nilai placeholder di komputer pengembangan.

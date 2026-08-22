@@ -89,6 +89,9 @@ async function worker(path, opsi = {}) {
 function bersihkan() {
   sql(`DELETE FROM pesta.beregam_contacts WHERE wa_id='${NOMOR}';`);
   sql(`DELETE FROM pesta.beregam_alerts WHERE 1=1;`);
+  // Hari libur palsu dari uji eskalasi luar jam kerja (bagian M) - dibersihkan
+  // di sini juga sebagai jaring pengaman kalau uji sebelumnya berhenti paksa.
+  sql(`DELETE FROM pesta.beregam_holidays WHERE nama='Uji - hari libur palsu';`);
   // Reset gerbang pemeliharaan supaya uji bisa dijalankan berulang tanpa
   // harus menunggu 60 detik dari jalannya yang terakhir.
   sql(`UPDATE pesta.beregam_health SET maintenance_ran_at=NULL, active_worker_id=NULL, lease_expires_at=NULL, bot_enabled=1 WHERE id=1;`);
@@ -136,7 +139,20 @@ async function main() {
   lapor("sapaan + menu diantrekan", Number(antre1) > 0, `${antre1} baris`);
 
   const isiMenu = sql(`SELECT payload FROM pesta.beregam_outbox WHERE contact_id=${kontakId} ORDER BY id LIMIT 1;`);
-  lapor("  menu memuat 6 pilihan", isiMenu.includes("Bicara dengan petugas"));
+  lapor("  menu memuat pilihan petugas", isiMenu.includes("Bicara dengan petugas"));
+
+  // Sapaan pertama tidak boleh terjadwal beberapa detik ke depan. Sempat
+  // begitu: PESTA menunda jadwalnya sendiri (jedaAcakDetik, 3-8 detik) DI
+  // ATAS jeda "mengetik" yang sudah dikerjakan worker - dobel, dan tidak
+  // menunjukkan indikator apa pun ke warga selama jeda pertama itu.
+  const detikTerjadwal = Number(
+    sql(`SELECT TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(3), scheduled_at) FROM pesta.beregam_outbox WHERE contact_id=${kontakId} ORDER BY id LIMIT 1;`)
+  );
+  lapor(
+    "  sapaan tidak dobel-jeda (scheduled_at <= sekarang)",
+    detikTerjadwal <= 1,
+    `${detikTerjadwal} detik ke depan`
+  );
 
   // Pilih menu 1
   await webhook(pesanWa("1"));
@@ -195,7 +211,7 @@ async function main() {
   console.log("\nH. PESAN BUKAN TEKS");
   await webhook(pesanWa("", { type: "image" }));
   await jeda(400);
-  lapor("foto dibalas ramah, bukan dianggap salah", Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId} AND payload LIKE '%hanya bisa membaca%';`)) > 0);
+  lapor("foto dibalas ramah, bukan dianggap salah", Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId} AND payload LIKE '%bisa membaca%';`)) > 0);
   lapor("  hitungan 'tidak paham' tidak naik", sql(`SELECT miss_count FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "0");
 
   await webhook(pesanWa("", { type: "ptt" }));
@@ -269,6 +285,75 @@ async function main() {
   await fetch(`${B}/api/beregam/health`);
   await jeda(300);
   lapor("  alert ditutup saat worker pulih", sql(`SELECT COUNT(*) FROM pesta.beregam_alerts WHERE kode='worker_mati' AND resolved_at IS NULL;`) === "0");
+
+  // === M. Eskalasi di luar jam kerja ======================================
+  //
+  // Memaksa isJamLayanan() bernilai false TANPA bergantung pada jam nyata
+  // saat uji ini kebetulan dijalankan: menandai hari ini sebagai hari libur.
+  // isJamLayanan() memeriksa beregam_holidays setelah hari & jam kerja -
+  // hari libur mengalahkan keduanya, apa pun jam sungguhannya sekarang.
+  console.log("\nM. ESKALASI DI LUAR JAM KERJA");
+
+  const tanggalWibHariIni = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  sql(`INSERT INTO pesta.beregam_holidays (tanggal, nama) VALUES ('${tanggalWibHariIni}', 'Uji - hari libur palsu') ON DUPLICATE KEY UPDATE nama=nama;`);
+  sql(`UPDATE pesta.beregam_sessions SET mode='bot', state='main_menu' WHERE contact_id=${kontakId};`);
+  // Bagian H (pesan suara) sudah membuka handover untuk kontak yang sama -
+  // escalate() sengaja tidak pernah membuka dua handover terbuka sekaligus
+  // untuk satu kontak, jadi harus diselesaikan dulu supaya bagian ini
+  // menguji handover yang BENAR-BENAR baru, bukan sisa dari bagian H.
+  sql(`UPDATE pesta.beregam_handovers SET status='resolved', resolved_at=UTC_TIMESTAMP(3) WHERE contact_id=${kontakId} AND status='open';`);
+
+  await webhook(pesanWa("petugas"));
+  await jeda(500);
+
+  const modeSetelah = sql(`SELECT mode FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`);
+  const stateSetelah = sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`);
+  lapor("mode TIDAK terkunci manual di luar jam kerja", modeSetelah === "bot", `mode=${modeSetelah}`);
+  lapor("state menunggu keterangan warga", stateSetelah === "awaiting_escalation_reason", `state=${stateSetelah}`);
+  lapor(
+    "handover terbuka dengan alasan awal",
+    sql(`SELECT reason FROM pesta.beregam_handovers WHERE contact_id=${kontakId} AND status='open' ORDER BY id DESC LIMIT 1;`).includes("Diminta warga")
+  );
+
+  // Yang diperbaiki: warga TIDAK boleh macet. "menu" harus langsung dibalas
+  // seketika, bukan menunggu manualModeTimeoutMinutes (bawaan 2 jam).
+  const outboxSebelumMenu = Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId} AND type='menu';`));
+  await webhook(pesanWa("menu"));
+  await jeda(500);
+  lapor(
+    "warga tidak macet - 'menu' tetap dibalas seketika",
+    Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId} AND type='menu';`)) > outboxSebelumMenu
+  );
+
+  // Kembalikan ke keadaan menunggu konteks untuk menguji penangkapan alasan.
+  sql(`UPDATE pesta.beregam_sessions SET state='awaiting_escalation_reason' WHERE contact_id=${kontakId};`);
+  await webhook(pesanWa("Mau tanya jadwal ViDCon minggu depan, agak mendesak"));
+  await jeda(500);
+
+  lapor(
+    "keterangan warga tersimpan di handover",
+    sql(`SELECT reason FROM pesta.beregam_handovers WHERE contact_id=${kontakId} AND status='open' ORDER BY id DESC LIMIT 1;`).includes("jadwal ViDCon")
+  );
+  lapor(
+    "sesi kembali dipakai normal setelah keterangan diberikan",
+    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "main_menu"
+  );
+
+  if (env.BEREGAM_STAFF_WA) {
+    const nomorStaf = env.BEREGAM_STAFF_WA.replace(/[^0-9]/g, "");
+    const jumlahNotifikasi = Number(
+      sql(
+        `SELECT COUNT(*) FROM pesta.beregam_outbox o JOIN pesta.beregam_contacts c ON c.id=o.contact_id WHERE c.phone='${nomorStaf}';`
+      )
+    );
+    lapor("notifikasi terkirim ke WA petugas", jumlahNotifikasi >= 2, `${jumlahNotifikasi} notifikasi`);
+    sql(`DELETE FROM pesta.beregam_contacts WHERE phone='${nomorStaf}';`);
+  } else {
+    console.log("  (BEREGAM_STAFF_WA belum diisi di .env - notifikasi petugas dilewati)");
+  }
+
+  sql(`DELETE FROM pesta.beregam_holidays WHERE tanggal='${tanggalWibHariIni}' AND nama='Uji - hari libur palsu';`);
+  sql(`UPDATE pesta.beregam_sessions SET mode='bot', state='main_menu' WHERE contact_id=${kontakId};`);
 
   // === Bersihkan ==========================================================
   bersihkan();

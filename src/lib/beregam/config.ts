@@ -72,6 +72,21 @@ const configSchema = z.object({
 
   /** Sewa kepemilikan worker, dalam detik. Lihat beregam_health. */
   leaseSeconds: angka(120),
+
+  /**
+   * Nomor WA petugas yang menerima notifikasi saat ada warga minta
+   * bicara dengan petugas. Angka saja, mis. "6285707473757".
+   *
+   * Opsional dengan sengaja: modul tetap berjalan tanpa nomor ini,
+   * hanya notifikasinya yang dilewati (dicatat di log server).
+   */
+  staffWaNumber: z
+    .string()
+    .optional()
+    .transform((v) => {
+      const bersih = v?.replace(/[^0-9]/g, "") ?? "";
+      return bersih.length >= 10 ? bersih : undefined;
+    }),
 });
 
 export type BeregamConfig = z.infer<typeof configSchema>;
@@ -117,6 +132,7 @@ export function getConfig(): BeregamConfig {
       timeoutSeconds: process.env.BEREGAM_AI_TIMEOUT_DETIK,
     },
     leaseSeconds: process.env.BEREGAM_LEASE_DETIK,
+    staffWaNumber: process.env.BEREGAM_STAFF_WA,
   });
 
   if (!hasil.success) {
