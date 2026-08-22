@@ -435,8 +435,10 @@ export default function AdminContactPage() {
       </div>
 
       {/* Reply Modal */}
+      {/* overflow-y-auto di sini, BUKAN items-center - dialog panjang di HP kecil butuh bisa digulung sampai ke tombol paling atas/bawah. */}
       {selectedItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 overflow-y-auto p-4 bg-slate-950/70 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center">
           <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
@@ -481,6 +483,7 @@ export default function AdminContactPage() {
                 <span>Kirim via App Email</span>
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}

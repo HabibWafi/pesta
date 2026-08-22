@@ -486,9 +486,10 @@ export default function AdminKontenPage() {
         </div>
       )}
 
-      {/* --- Modal edit testimoni --- */}
+      {/* --- Modal edit testimoni --- overflow-y-auto TANPA items-center, lihat catatan di VidconModal.tsx untuk alasannya. */}
       {editTestimoni && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-50 overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center">
           <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 my-8">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-slate-900 dark:text-white text-base">
@@ -597,12 +598,14 @@ export default function AdminKontenPage() {
               </button>
             </div>
           </div>
+          </div>
         </div>
       )}
 
-      {/* --- Modal edit FAQ --- */}
+      {/* --- Modal edit FAQ --- overflow-y-auto TANPA items-center, lihat catatan di VidconModal.tsx untuk alasannya. */}
       {editFaq && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-50 overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center">
           <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 my-8">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-slate-900 dark:text-white text-base">
@@ -685,6 +688,7 @@ export default function AdminKontenPage() {
                 {menyimpan ? "Menyimpan..." : "Simpan"}
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}

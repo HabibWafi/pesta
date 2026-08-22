@@ -52,7 +52,17 @@ export default function VidconModal({ isOpen, onClose }: VidconModalProps) {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      {/*
+        Wrapper INI cuma pintu gulung (overflow-y-auto), BUKAN flex
+        pemusat. Memusatkan lewat items-center di sini adalah bug klasik:
+        saat kartunya lebih tinggi dari layar (form panjang di HP), bagian
+        ATAS kartu - termasuk tombol tutup - terdorong ke luar area yang
+        bisa digulung, dan warga tidak akan pernah bisa menggulung ke atas
+        untuk mencapainya. Pemusatan yang sesungguhnya dipindah ke wrapper
+        di dalam (min-h-full), yang aman digulung dari mana saja karena ia
+        sendiri bukan wadah gulir - wadah gulirnya tetap yang di luar.
+      */}
+      <div className="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -62,6 +72,8 @@ export default function VidconModal({ isOpen, onClose }: VidconModalProps) {
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-md"
         />
 
+        {/* Pemusat sesungguhnya - aman digulung karena bukan dia wadah gulirnya. */}
+        <div className="relative flex min-h-full items-center justify-center">
         {/* Modal Card */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -302,6 +314,7 @@ export default function VidconModal({ isOpen, onClose }: VidconModalProps) {
             </div>
           </form>
         </motion.div>
+        </div>
       </div>
     </AnimatePresence>
   );

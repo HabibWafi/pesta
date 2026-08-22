@@ -377,9 +377,11 @@ function TabMenu() {
         <Plus className="w-4 h-4" /> Tambah Menu
       </button>
 
+      {/* overflow-y-auto di sini, BUKAN items-center - textarea 8 baris gampang lebih tinggi dari layar HP. */}
       {edit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden my-8">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <h2 className="font-bold text-slate-900">{edit.id ? "Edit Menu" : "Menu Baru"}</h2>
               <button onClick={() => setEdit(null)} className="p-1.5 rounded-lg hover:bg-slate-100">
@@ -447,6 +449,7 @@ function TabMenu() {
                 <Save className="w-4 h-4" /> {menyimpan ? "Menyimpan..." : "Simpan"}
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}
@@ -576,9 +579,11 @@ function TabPesan() {
         ))}
       </div>
 
+      {/* overflow-y-auto di sini, BUKAN items-center - textarea 9 baris gampang lebih tinggi dari layar HP. */}
       {edit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden my-8">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <h2 className="font-bold text-slate-900">{edit.label}</h2>
               <button onClick={() => setEdit(null)} className="p-1.5 rounded-lg hover:bg-slate-100">
@@ -623,6 +628,7 @@ function TabPesan() {
                 </button>
               </div>
             </div>
+          </div>
           </div>
         </div>
       )}

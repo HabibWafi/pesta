@@ -74,7 +74,8 @@ export default function PengaduanModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      {/* overflow-y-auto di sini, BUKAN items-center - lihat catatan di VidconModal.tsx untuk alasannya. */}
+      <div className="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -84,6 +85,8 @@ export default function PengaduanModal({
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-md"
         />
 
+        {/* Pemusat sesungguhnya - aman digulung karena bukan dia wadah gulirnya. */}
+        <div className="relative flex min-h-full items-center justify-center">
         {/* Modal Card */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -370,6 +373,7 @@ export default function PengaduanModal({
             </div>
           )}
         </motion.div>
+        </div>
       </div>
     </AnimatePresence>
   );
