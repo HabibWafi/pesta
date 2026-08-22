@@ -300,33 +300,43 @@ html.a11y-kursor-besar body :where(a, button, [role="button"], input, select, te
 /* --------------------------------------------------------------------------
    6. Penyesuaian warna
 
-   Filter dipasang di <body>, BUKAN di <html>.
+   Filter dipasang di <html>, dan HANYA di <html>.
 
-   Elemen apa pun yang punya filter menjadi containing block bagi keturunannya
-   yang position:fixed. Kalau filter dipasang di <html>, tombol mengambang dan
-   modal berhenti menempel ke layar dan ikut menggulung bersama halaman -
-   termasuk tombol panel aksesibilitas itu sendiri, yang membuat pengunjung
-   terjebak dalam mode yang baru saja dinyalakannya.
+   Elemen biasa yang punya `filter` berhenti membiarkan keturunannya yang
+   `position: fixed` menempel ke layar - keturunan itu berpindah acuan ke
+   elemen yang difilter dan ikut menggulung bersama halaman. Elemen AKAR
+   dikecualikan dari perilaku itu oleh peramban: filternya berlaku ke seluruh
+   kanvas tanpa merebut acuan posisi siapa pun.
 
-   Panel aksesibilitas dikecualikan lewat .a11y-panel di bawah, supaya
-   kendalinya tetap terbaca normal walau halaman sedang dimonokromkan.
+   Versi sebelumnya memasang filter di <body> - persis kasus yang salah -
+   dengan anggapan `filter: none` pada panel cukup mengecualikannya. Ternyata
+   tidak: `filter: none` hanya menghapus efek visualnya, TIDAK mengembalikan
+   posisi tetapnya.
+
+   Akibatnya nyata dan menjebak. Diukur langsung: tombol panel aksesibilitas
+   berada 824px dari atas layar dalam keadaan normal, lalu melompat ke
+   13558px begitu mode monokrom dinyalakan dan halaman digulung - jauh di
+   luar layar. Pengunjung yang baru saja menyalakan mode warna kehilangan
+   satu-satunya tombol untuk mematikannya kembali. Hal yang sama menimpa
+   seluruh modal di situs ini.
+
+   Setelah dipindah ke <html>, diukur ulang pada kelima mode warna: tombol
+   tetap di 824px dan tetap terlihat.
+
+   `backdrop-filter` pada lapisan menutup layar sempat dicoba sebagai
+   alternatif dan DITOLAK - lapisannya terpasang benar, tetapi efek warnanya
+   sama sekali tidak muncul.
    -------------------------------------------------------------------------- */
-html.a11y-monokrom body {
+html.a11y-monokrom {
   filter: grayscale(1);
 }
 
-html.a11y-saturasi-rendah body {
+html.a11y-saturasi-rendah {
   filter: saturate(0.45);
 }
 
-html.a11y-saturasi-tinggi body {
+html.a11y-saturasi-tinggi {
   filter: saturate(1.9);
-}
-
-html.a11y-monokrom body .a11y-panel,
-html.a11y-saturasi-rendah body .a11y-panel,
-html.a11y-saturasi-tinggi body .a11y-panel {
-  filter: none;
 }
 
 /*
