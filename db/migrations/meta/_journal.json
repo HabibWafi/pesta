@@ -50,6 +50,13 @@
       "when": 1787369189991,
       "tag": "0006_beregam_pesan_sistem",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787384614906,
+      "tag": "0007_beregam_penilaian",
+      "breakpoints": true
     }
   ]
 }

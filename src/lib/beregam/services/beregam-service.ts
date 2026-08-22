@@ -6,6 +6,7 @@ import {
   beregamHandovers,
   beregamHolidays,
   beregamMessages,
+  beregamPenilaian,
   beregamSessions,
   type BeregamContact,
   type BeregamSession,
@@ -38,8 +39,14 @@ const KATA_MENU = ["menu", "0", "batal", "kembali", "mulai"];
 const KATA_PETUGAS = ["petugas", "admin", "manusia", "operator", "cs"];
 const KATA_BERHENTI = ["stop", "berhenti", "unsubscribe", "hapus saya"];
 
+const KATA_LEWATI = ["lewati", "skip", "nanti", "tidak", "gak", "engga", "enggak"];
+
 /** Sesi menunggu warga menuliskan keperluannya (eskalasi di luar jam kerja). */
 const STATE_MENUNGGU_KONTEKS = "awaiting_escalation_reason";
+/** Sesi menunggu warga membalas angka 1-5 setelah percakapan diselesaikan. */
+const STATE_MENUNGGU_SKOR = "awaiting_rating_score";
+/** Skor sudah diterima, menunggu masukan tertulis yang sifatnya opsional. */
+const STATE_MENUNGGU_KOMENTAR = "awaiting_rating_comment";
 
 const NAMA_HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
@@ -174,6 +181,26 @@ export class BeregamService {
     const kedaluwarsa = !sesi.expiresAt || sesi.expiresAt < new Date();
     if (kedaluwarsa || sesi.state === "idle") {
       await this.kirimMenuUtama(contact, sesi, { sapa: true });
+      return;
+    }
+
+    // --- LANGKAH 8b: penilaian layanan -------------------------------------
+    //
+    // Diperiksa SEBELUM pencocokan menu di bawah: dalam keadaan ini angka
+    // 1-5 berarti skor kepuasan, bukan nomor menu.
+    //
+    // Sengaja diletakkan SESUDAH pagar kedaluwarsa, berbeda dari LANGKAH 7b.
+    // Penilaian ditanyakan segera setelah percakapan selesai dan wajar dijawab
+    // dalam hitungan menit; warga yang baru membalas berjam-jam kemudian
+    // sedang memulai urusan baru, dan angka "1" darinya jauh lebih mungkin
+    // berarti menu 1 daripada "sangat tidak puas".
+    if (sesi.state === STATE_MENUNGGU_SKOR) {
+      await this.terimaSkor(contact, sesi, bersih);
+      return;
+    }
+
+    if (sesi.state === STATE_MENUNGGU_KOMENTAR) {
+      await this.terimaKomentar(contact, sesi, teks.trim(), bersih);
       return;
     }
 
@@ -475,6 +502,165 @@ export class BeregamService {
       .update(beregamSessions)
       .set({
         state: "main_menu",
+        missCount: 0,
+        lastActivityAt: sekarang,
+        expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),
+      })
+      .where(eq(beregamSessions.id, sesi.id));
+  }
+
+  // =========================================================================
+  // Penilaian layanan
+  // =========================================================================
+
+  /**
+   * Menanyakan penilaian, dipanggil saat petugas menandai percakapan selesai.
+   *
+   * Ditanyakan SEKARANG, bukan lewat survei terpisah nanti: pengalamannya
+   * masih segar, dan warga sudah ada di percakapan yang sama - tidak perlu
+   * membuka tautan apa pun.
+   *
+   * Dilewati diam-diam bila warga sudah menyatakan berhenti, sedang diblokir,
+   * atau saklar bot sedang dimatikan. Pertanyaan kepuasan tetaplah pesan
+   * otomatis; aturan yang berlaku untuk pesan otomatis lain berlaku juga di
+   * sini.
+   */
+  async mintaPenilaian(contact: BeregamContact, handoverId: number | null): Promise<void> {
+    if (contact.optedOutAt || contact.isBlocked) return;
+
+    const health = await ambilHealth();
+    if (!health.botEnabled) return;
+
+    const sesi = await ambilAtauBuatSesi(contact.id);
+    const sekarang = new Date();
+
+    await db
+      .update(beregamSessions)
+      .set({
+        mode: "bot",
+        state: STATE_MENUNGGU_SKOR,
+        // handoverId dititipkan di context supaya penilaiannya bisa
+        // dihubungkan ke percakapan yang benar saat warga membalas nanti.
+        context: { handoverId },
+        missCount: 0,
+        lastActivityAt: sekarang,
+        expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),
+      })
+      .where(eq(beregamSessions.id, sesi.id));
+
+    await this.balas(contact, await ambilPesan("penilaian_minta"), "bot");
+  }
+
+  /** Menerima angka 1-5. Balasan lain memulangkan warga ke menu, bukan menahannya. */
+  private async terimaSkor(
+    contact: BeregamContact,
+    sesi: BeregamSession,
+    bersih: string
+  ): Promise<void> {
+    if (KATA_LEWATI.includes(bersih)) {
+      await this.selesaikanPenilaian(contact, sesi, "penilaian_dilewati");
+      return;
+    }
+
+    const skor = Number(bersih);
+    if (!Number.isInteger(skor) || skor < 1 || skor > 5) {
+      /*
+       * Bukan angka 1-5, dan bukan kata melewati.
+       *
+       * TIDAK diminta ulang. Warga yang membalas hal lain di sini sedang
+       * memulai urusan baru, bukan salah mengetik - menahannya dalam
+       * pertanyaan kepuasan sampai ia menjawab benar akan mengubah ajakan
+       * memberi masukan menjadi penghalang. Penilaiannya dilewati diam-diam
+       * dan pesannya diperlakukan seperti pesan biasa.
+       */
+      await db
+        .update(beregamSessions)
+        .set({ state: "main_menu", context: null })
+        .where(eq(beregamSessions.id, sesi.id));
+
+      await this.kirimMenuUtama(contact, { ...sesi, state: "main_menu" }, { sapa: false });
+      return;
+    }
+
+    const konteks = (sesi.context ?? {}) as { handoverId?: number | null };
+    const handoverId = konteks.handoverId ?? null;
+
+    // Petugas yang menangani diambil dari handover-nya, supaya penilaian bisa
+    // dilaporkan per petugas tanpa menanyakannya ke warga.
+    let ditanganiOleh: number | null = null;
+    if (handoverId) {
+      const [h] = await db
+        .select({ assignedTo: beregamHandovers.assignedTo })
+        .from(beregamHandovers)
+        .where(eq(beregamHandovers.id, handoverId))
+        .limit(1);
+      ditanganiOleh = h?.assignedTo ?? null;
+    }
+
+    const [dibuat] = await db
+      .insert(beregamPenilaian)
+      .values({ contactId: contact.id, handoverId, skor, ditanganiOleh })
+      .$returningId();
+
+    const sekarang = new Date();
+    await db
+      .update(beregamSessions)
+      .set({
+        state: STATE_MENUNGGU_KOMENTAR,
+        context: { penilaianId: dibuat.id },
+        lastActivityAt: sekarang,
+        expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),
+      })
+      .where(eq(beregamSessions.id, sesi.id));
+
+    await this.balas(
+      contact,
+      await ambilPesan("penilaian_terima", { skor: String(skor) }),
+      "bot"
+    );
+
+    console.info(
+      `[beregam] penilaian ${skor}/5 dari kontak=${samarkanNomor(contact.phone)}`
+    );
+  }
+
+  /** Menerima masukan tertulis yang sifatnya opsional. */
+  private async terimaKomentar(
+    contact: BeregamContact,
+    sesi: BeregamSession,
+    teks: string,
+    bersih: string
+  ): Promise<void> {
+    if (KATA_LEWATI.includes(bersih) || !teks) {
+      await this.selesaikanPenilaian(contact, sesi, "penilaian_dilewati");
+      return;
+    }
+
+    const konteks = (sesi.context ?? {}) as { penilaianId?: number };
+    if (konteks.penilaianId) {
+      await db
+        .update(beregamPenilaian)
+        .set({ komentar: teks.slice(0, 2000) })
+        .where(eq(beregamPenilaian.id, konteks.penilaianId));
+    }
+
+    await this.selesaikanPenilaian(contact, sesi, "penilaian_terima_komentar");
+  }
+
+  /** Menutup alur penilaian dan mengembalikan sesi ke keadaan normal. */
+  private async selesaikanPenilaian(
+    contact: BeregamContact,
+    sesi: BeregamSession,
+    kunciPesan: "penilaian_dilewati" | "penilaian_terima_komentar"
+  ): Promise<void> {
+    await this.balas(contact, await ambilPesan(kunciPesan), "bot");
+
+    const sekarang = new Date();
+    await db
+      .update(beregamSessions)
+      .set({
+        state: "main_menu",
+        context: null,
         missCount: 0,
         lastActivityAt: sekarang,
         expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),

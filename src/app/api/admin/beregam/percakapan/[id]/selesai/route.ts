@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import * as z from "zod";
 import { db } from "@/lib/db";
 import { beregamContacts, beregamHandovers, beregamSessions } from "@/lib/beregam/db/schema";
 import { getAdminSession } from "@/lib/auth";
+import { getBeregamService } from "@/lib/beregam/services/beregam-service";
 
 const selesaiSchema = z.object({ catatan: z.string().trim().max(1000).optional() });
 
@@ -33,6 +34,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return NextResponse.json({ success: false, message: "Kontak tidak ditemukan" }, { status: 404 });
     }
 
+    // Id handover diambil SEBELUM statusnya diubah - sesudah diubah, filter
+    // "open/claimed" tidak akan menemukannya lagi, dan penilaian warga jadi
+    // tidak bisa dihubungkan ke percakapan mana pun.
+    const [handover] = await db
+      .select({ id: beregamHandovers.id })
+      .from(beregamHandovers)
+      .where(
+        and(
+          eq(beregamHandovers.contactId, kontak.id),
+          inArray(beregamHandovers.status, ["open", "claimed"])
+        )
+      )
+      .orderBy(desc(beregamHandovers.id))
+      .limit(1);
+
     await db
       .update(beregamHandovers)
       .set({
@@ -49,6 +65,20 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       .update(beregamSessions)
       .set({ mode: "bot", state: "idle" })
       .where(eq(beregamSessions.contactId, kontak.id));
+
+    /*
+     * Menanyakan penilaian layanan.
+     *
+     * Dibungkus try-catch sendiri: kegagalan mengirim pertanyaan kepuasan
+     * TIDAK boleh menggagalkan penandaan selesai. Petugas sudah menyelesaikan
+     * pekerjaannya, dan status percakapan tidak boleh bergantung pada
+     * berhasil tidaknya satu pesan tambahan.
+     */
+    try {
+      await getBeregamService().mintaPenilaian(kontak, handover?.id ?? null);
+    } catch (error) {
+      console.error("[beregam] gagal meminta penilaian:", error);
+    }
 
     return NextResponse.json({ success: true, message: "Percakapan ditandai selesai" });
   } catch (error) {

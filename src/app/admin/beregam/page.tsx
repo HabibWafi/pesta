@@ -23,11 +23,12 @@ import {
   Search,
   User,
   Ban,
+  Star,
 } from "lucide-react";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import type { BeregamFaq } from "@/lib/beregam/db/schema";
 
-type Tab = "menu" | "pesan" | "percakapan";
+type Tab = "menu" | "pesan" | "percakapan" | "penilaian";
 
 interface Konfigurasi {
   rateLimitPerMenit: number;
@@ -109,11 +110,15 @@ export default function AdminBeregamPage() {
         <TabBtn aktif={tab === "percakapan"} onClick={() => setTab("percakapan")} icon={Inbox}>
           Percakapan
         </TabBtn>
+        <TabBtn aktif={tab === "penilaian"} onClick={() => setTab("penilaian")} icon={Star}>
+          Penilaian
+        </TabBtn>
       </div>
 
       {tab === "menu" && <TabMenu />}
       {tab === "pesan" && <TabPesan />}
       {tab === "percakapan" && <TabPercakapan />}
+      {tab === "penilaian" && <TabPenilaian />}
     </div>
   );
 }
@@ -951,6 +956,151 @@ function DetailPercakapan({ id, onClose, onBerubah }: { id: number; onClose: () 
             Balasan dikirim dari nomor bot dan mengunci sesi ke mode manual - bot tidak akan ikut menjawab.
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// TAB: Penilaian layanan
+// =============================================================================
+
+interface Ringkasan {
+  jumlah: number;
+  rata: number | null;
+  sebaran: Record<string, number>;
+  berkomentar: number;
+  bulanIni: number;
+}
+
+interface BarisPenilaian {
+  id: number;
+  skor: number;
+  komentar: string | null;
+  created_at: string;
+  phone: string | null;
+  name: string | null;
+  petugas: string | null;
+}
+
+function Bintang({ skor }: { skor: number }) {
+  return (
+    <span className="inline-flex items-center gap-0.5" aria-label={`${skor} dari 5`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Star
+          key={i}
+          className={`w-3.5 h-3.5 ${i <= skor ? "fill-amber-400 text-amber-400" : "text-slate-300"}`}
+        />
+      ))}
+      {/* Angka ditulis juga, bukan hanya bintang - jumlah bintang dibedakan
+          lewat warna, dan itu hilang di mode kontras atau bagi pengguna buta
+          warna. */}
+      <span className="ml-1 text-xs font-bold text-slate-600">{skor}/5</span>
+    </span>
+  );
+}
+
+function TabPenilaian() {
+  const [loading, setLoading] = useState(true);
+  const [ringkasan, setRingkasan] = useState<Ringkasan | null>(null);
+  const [daftar, setDaftar] = useState<BarisPenilaian[]>([]);
+
+  const ambil = useCallback(async (batal?: () => boolean) => {
+    try {
+      const res = await fetch("/api/admin/beregam/penilaian");
+      const json = await res.json();
+      if (batal?.()) return;
+      if (!json.success) throw new Error(json.message);
+      setRingkasan(json.ringkasan);
+      setDaftar(json.daftar);
+    } catch (err) {
+      if (batal?.()) return;
+      toast.error("Gagal memuat penilaian", {
+        description: err instanceof Error ? err.message : "Terjadi kendala jaringan.",
+      });
+    } finally {
+      if (!batal?.()) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let dilepas = false;
+    void ambil(() => dilepas);
+    return () => {
+      dilepas = true;
+    };
+  }, [ambil]);
+
+  if (loading) {
+    return <div className="py-16 text-center text-sm text-slate-500">Memuat penilaian...</div>;
+  }
+
+  const total = ringkasan?.jumlah ?? 0;
+
+  return (
+    <div className="space-y-5 pt-2">
+      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex gap-3 text-sm text-indigo-900">
+        <Info className="w-5 h-5 shrink-0 mt-0.5" />
+        <div>
+          Penilaian ditanyakan bot otomatis begitu petugas menekan{" "}
+          <strong>Tandai Selesai</strong> pada sebuah percakapan - saat pengalamannya masih
+          segar. Warga boleh melewatinya, dan bot tetap kembali normal.
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KartuInfo label="Rata-rata" nilai={ringkasan?.rata !== null && ringkasan?.rata !== undefined ? `${ringkasan.rata} / 5` : "-"} />
+        <KartuInfo label="Total penilaian" nilai={String(total)} />
+        <KartuInfo label="30 hari terakhir" nilai={String(ringkasan?.bulanIni ?? 0)} />
+        <KartuInfo label="Disertai masukan" nilai={String(ringkasan?.berkomentar ?? 0)} />
+      </div>
+
+      {total > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
+          <h3 className="text-[11px] font-extrabold tracking-wider uppercase text-slate-500 mb-3">
+            Sebaran Skor
+          </h3>
+          {[5, 4, 3, 2, 1].map((s) => {
+            const n = ringkasan?.sebaran?.[String(s)] ?? 0;
+            const persen = total > 0 ? Math.round((n / total) * 100) : 0;
+            return (
+              <div key={s} className="flex items-center gap-3 text-xs">
+                <span className="w-8 font-bold text-slate-700 shrink-0">{s} ★</span>
+                <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div className="h-full rounded-full bg-amber-400" style={{ width: `${persen}%` }} />
+                </div>
+                <span className="w-16 text-right tabular-nums text-slate-500 shrink-0">
+                  {n} ({persen}%)
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm divide-y divide-slate-100">
+        {daftar.length === 0 ? (
+          <div className="p-10 text-center text-sm text-slate-500">
+            Belum ada penilaian masuk. Penilaian pertama akan muncul setelah petugas
+            menyelesaikan sebuah percakapan.
+          </div>
+        ) : (
+          daftar.map((p) => (
+            <div key={p.id} className="p-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <Bintang skor={p.skor} />
+                <span className="text-xs text-slate-400">{waktuSingkat(p.created_at)}</span>
+              </div>
+              {p.komentar && (
+                <p className="text-sm text-slate-700 mt-2 whitespace-pre-line">{p.komentar}</p>
+              )}
+              <div className="mt-2 flex items-center gap-3 text-[11px] text-slate-400 flex-wrap">
+                <span>{p.name || (p.phone ? `+${p.phone}` : "kontak terhapus")}</span>
+                {p.petugas && <span>ditangani {p.petugas}</span>}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

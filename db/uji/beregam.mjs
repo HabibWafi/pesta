@@ -355,6 +355,68 @@ async function main() {
   sql(`DELETE FROM pesta.beregam_holidays WHERE tanggal='${tanggalWibHariIni}' AND nama='Uji - hari libur palsu';`);
   sql(`UPDATE pesta.beregam_sessions SET mode='bot', state='main_menu' WHERE contact_id=${kontakId};`);
 
+  // === N. Penilaian layanan ================================================
+  console.log("\nN. PENILAIAN LAYANAN");
+
+  // Bot menanyakan penilaian saat petugas menandai selesai. Di uji ini
+  // keadaannya disiapkan langsung, karena penandaan selesai lewat panel admin
+  // butuh sesi login yang bukan cakupan uji ini.
+  sql(`UPDATE pesta.beregam_sessions SET mode='bot', state='awaiting_rating_score', context='{"handoverId":null}', expires_at=UTC_TIMESTAMP(3) + INTERVAL 30 MINUTE WHERE contact_id=${kontakId};`);
+
+  await webhook(pesanWa("5"));
+  await jeda(500);
+
+  lapor(
+    "skor 1-5 tersimpan sebagai penilaian",
+    sql(`SELECT skor FROM pesta.beregam_penilaian WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`) === "5"
+  );
+  lapor(
+    "  sesi lanjut menunggu masukan tertulis",
+    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "awaiting_rating_comment"
+  );
+
+  await webhook(pesanWa("Petugasnya ramah dan jawabannya jelas"));
+  await jeda(500);
+
+  lapor(
+    "masukan tertulis tersimpan di penilaian yang sama",
+    sql(`SELECT komentar FROM pesta.beregam_penilaian WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`).includes("ramah")
+  );
+  lapor(
+    "  sesi kembali normal setelah penilaian selesai",
+    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "main_menu"
+  );
+
+  // Warga yang membalas hal lain saat ditanya penilaian TIDAK boleh terjebak -
+  // ini pagar yang sama dengan eskalasi luar jam kerja.
+  sql(`UPDATE pesta.beregam_sessions SET state='awaiting_rating_score', context='{"handoverId":null}', expires_at=UTC_TIMESTAMP(3) + INTERVAL 30 MINUTE WHERE contact_id=${kontakId};`);
+  const penilaianSebelum = Number(sql(`SELECT COUNT(*) FROM pesta.beregam_penilaian WHERE contact_id=${kontakId};`));
+  const menuSebelum = Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId} AND type='menu';`));
+
+  await webhook(pesanWa("saya mau tanya data penduduk"));
+  await jeda(500);
+
+  lapor(
+    "balasan bukan angka TIDAK tersimpan sebagai penilaian",
+    Number(sql(`SELECT COUNT(*) FROM pesta.beregam_penilaian WHERE contact_id=${kontakId};`)) === penilaianSebelum
+  );
+  lapor(
+    "  warga tidak terjebak - langsung dikembalikan ke menu",
+    Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId} AND type='menu';`)) > menuSebelum &&
+      sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "main_menu"
+  );
+
+  // "lewati" menutup penilaian tanpa menyimpan apa pun.
+  sql(`UPDATE pesta.beregam_sessions SET state='awaiting_rating_score', context='{"handoverId":null}', expires_at=UTC_TIMESTAMP(3) + INTERVAL 30 MINUTE WHERE contact_id=${kontakId};`);
+  const sblmLewati = Number(sql(`SELECT COUNT(*) FROM pesta.beregam_penilaian WHERE contact_id=${kontakId};`));
+  await webhook(pesanWa("lewati"));
+  await jeda(500);
+  lapor(
+    "'lewati' menutup penilaian tanpa menyimpan skor",
+    Number(sql(`SELECT COUNT(*) FROM pesta.beregam_penilaian WHERE contact_id=${kontakId};`)) === sblmLewati &&
+      sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "main_menu"
+  );
+
   // === Bersihkan ==========================================================
   bersihkan();
   console.log("\nData uji dibersihkan.");

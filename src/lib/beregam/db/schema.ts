@@ -520,6 +520,50 @@ export const beregamSettings = mysqlTable(
 );
 
 // ---------------------------------------------------------------------------
+// 16. Penilaian layanan dari warga
+//
+// Ditanyakan bot tepat setelah petugas menandai percakapan selesai - saat
+// pengalamannya masih segar, bukan lewat survei terpisah yang jarang diisi.
+//
+// TERPISAH dari tabel `testimonials` milik halaman depan. Keduanya sama-sama
+// berisi pendapat warga, tetapi asalnya berbeda dan aturannya berbeda:
+// testimoni ditayangkan ke publik dan WAJIB bisa ditelusuri sumbernya,
+// sedangkan penilaian di sini adalah umpan balik internal untuk mengukur mutu
+// layanan - tidak pernah ditampilkan di halaman publik.
+// ---------------------------------------------------------------------------
+export const beregamPenilaian = mysqlTable(
+  "beregam_penilaian",
+  {
+    id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+    contactId: bigint("contact_id", { mode: "number" })
+      .notNull()
+      .references(() => beregamContacts.id, { onDelete: "cascade" }),
+    /**
+     * Handover yang dinilai. Boleh null bila percakapannya sudah dihapus,
+     * supaya riwayat penilaiannya tidak ikut hilang - angkanya tetap sah
+     * sebagai catatan mutu layanan walau percakapannya tidak ada lagi.
+     */
+    handoverId: bigint("handover_id", { mode: "number" }).references(
+      () => beregamHandovers.id,
+      { onDelete: "set null" }
+    ),
+    /** 1 (sangat tidak puas) sampai 5 (sangat puas). */
+    skor: tinyint("skor").notNull(),
+    /** Masukan bebas. Opsional - warga boleh memberi angka saja. */
+    komentar: text("komentar"),
+    /** Petugas yang menangani percakapan ini, untuk laporan per petugas. */
+    ditanganiOleh: int("ditangani_oleh").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: dibuat(),
+  },
+  (t) => [
+    index("beregam_penilaian_waktu_idx").on(t.createdAt),
+    index("beregam_penilaian_kontak_idx").on(t.contactId),
+  ]
+);
+
+// ---------------------------------------------------------------------------
 // Tipe turunan
 // ---------------------------------------------------------------------------
 export type BeregamContact = InferSelectModel<typeof beregamContacts>;
@@ -538,5 +582,6 @@ export type BeregamAlert = InferSelectModel<typeof beregamAlerts>;
 export type BeregamHoliday = InferSelectModel<typeof beregamHolidays>;
 export type BeregamSinonim = InferSelectModel<typeof beregamSinonim>;
 export type BeregamSetting = InferSelectModel<typeof beregamSettings>;
+export type BeregamPenilaian = InferSelectModel<typeof beregamPenilaian>;
 
 export type SumberPesan = (typeof SUMBER_PESAN)[number];

@@ -105,6 +105,43 @@ export const DEFINISI_PESAN = {
     bantuan: "Dikirim kalau balasan warga kosong (mis. cuma emoji yang tersaring).",
     bawaan: "Boleh dituliskan dalam beberapa kata saja ya, secukupnya. 🙏",
   },
+  penilaian_minta: {
+    label: "Minta penilaian setelah percakapan selesai",
+    bantuan:
+      "Dikirim otomatis begitu petugas menandai percakapan selesai. Angka 1-5 yang dibalas warga langsung tersimpan.",
+    bawaan:
+      "Percakapan Anda sudah diselesaikan petugas kami. 🙏\n\n" +
+      "Boleh minta waktunya sebentar? Seberapa puas Anda dengan layanan tadi?\n\n" +
+      "Balas dengan *angka 1 sampai 5*:\n" +
+      "5 = Sangat puas\n" +
+      "4 = Puas\n" +
+      "3 = Cukup\n" +
+      "2 = Kurang puas\n" +
+      "1 = Tidak puas\n\n" +
+      "Ketik *lewati* bila sedang tidak sempat.",
+  },
+  penilaian_terima: {
+    label: "Penilaian diterima, tawarkan masukan tertulis",
+    bantuan: "Variabel {skor} otomatis diisi angka yang dipilih warga.",
+    bawaan:
+      "Terima kasih atas penilaiannya ({skor}/5)! ⭐\n\n" +
+      "Kalau ada masukan atau saran, silakan tuliskan sekarang - sangat membantu " +
+      "kami memperbaiki layanan.\n\n" +
+      "Atau ketik *lewati* kalau sudah cukup.",
+  },
+  penilaian_terima_komentar: {
+    label: "Masukan tertulis diterima",
+    bawaan:
+      "Masukan Anda sudah kami catat dan akan disampaikan ke petugas terkait. " +
+      "Terima kasih banyak sudah meluangkan waktu! 🙏\n\n" +
+      "Ketik *menu* kapan saja bila butuh layanan lain.",
+  },
+  penilaian_dilewati: {
+    label: "Warga melewati penilaian",
+    bawaan:
+      "Baik, tidak masalah. Terima kasih sudah menghubungi kami! 😊\n\n" +
+      "Ketik *menu* kapan saja bila butuh layanan lain.",
+  },
   eskalasi_terima_konteks: {
     label: "Eskalasi - keterangan warga sudah diterima",
     bantuan: "Variabel {jam_layanan} otomatis diisi jadwal jam kerja dari pengaturan.",
