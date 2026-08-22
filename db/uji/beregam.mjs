@@ -417,6 +417,26 @@ async function main() {
       sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "main_menu"
   );
 
+  // Sebagian besar percakapan selesai di bot dan tidak pernah sampai ke
+  // petugas. Kalau penilaian hanya bisa dibuka petugas, percakapan itu tidak
+  // pernah ternilai sama sekali - karena itu ada kata kunci sendiri.
+  await webhook(pesanWa("nilai"));
+  await jeda(500);
+  lapor(
+    "kata kunci 'nilai' membuka penilaian tanpa perlu petugas",
+    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "awaiting_rating_score"
+  );
+
+  await webhook(pesanWa("4"));
+  await jeda(500);
+  lapor(
+    "  skor dari jalur mandiri tersimpan tanpa handover",
+    sql(`SELECT CONCAT(skor, '|', IFNULL(handover_id, 'null')) FROM pesta.beregam_penilaian WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`) === "4|null"
+  );
+
+  await webhook(pesanWa("lewati"));
+  await jeda(500);
+
   // === Bersihkan ==========================================================
   bersihkan();
   console.log("\nData uji dibersihkan.");

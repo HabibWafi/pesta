@@ -39,6 +39,16 @@ const KATA_MENU = ["menu", "0", "batal", "kembali", "mulai"];
 const KATA_PETUGAS = ["petugas", "admin", "manusia", "operator", "cs"];
 const KATA_BERHENTI = ["stop", "berhenti", "unsubscribe", "hapus saya"];
 
+/**
+ * Membuka penilaian atas kemauan sendiri.
+ *
+ * Penilaian juga ditanyakan otomatis saat petugas menandai percakapan
+ * selesai, tapi itu hanya menjangkau percakapan yang sampai ke petugas -
+ * sebagian besar percakapan selesai di bot dan tidak pernah ditanya apa pun.
+ * Kata kunci ini yang membukanya untuk semua orang.
+ */
+const KATA_NILAI = ["nilai", "penilaian", "feedback", "masukan", "saran", "rating"];
+
 const KATA_LEWATI = ["lewati", "skip", "nanti", "tidak", "gak", "engga", "enggak"];
 
 /** Sesi menunggu warga menuliskan keperluannya (eskalasi di luar jam kerja). */
@@ -157,6 +167,13 @@ export class BeregamService {
 
     if (KATA_MENU.includes(bersih)) {
       await this.kirimMenuUtama(contact, sesi, { sapa: false });
+      return;
+    }
+
+    // Tanpa handover - penilaian atas kemauan sendiri tidak melekat pada
+    // percakapan petugas mana pun, dan itu memang wajar.
+    if (KATA_NILAI.includes(bersih)) {
+      await this.mintaPenilaian(contact, null);
       return;
     }
 

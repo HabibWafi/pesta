@@ -50,7 +50,9 @@ export const DEFINISI_PESAN = {
   },
   menu_footer: {
     label: "Penutup daftar menu",
-    bawaan: "Ketik *menu* kapan saja untuk kembali ke daftar ini.",
+    bawaan:
+      "Ketik *menu* kapan saja untuk kembali ke daftar ini, atau *nilai* " +
+      "untuk memberi penilaian dan masukan.",
   },
   menu_footer_jawaban: {
     label: "Ajakan setelah menjawab satu menu",
