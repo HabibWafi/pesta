@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { beregamOutbox } from "@/lib/beregam/db/schema";
+import { beregamOutbox, type SumberPesan } from "@/lib/beregam/db/schema";
 import { otorisasiWorker } from "@/lib/beregam/auth";
 import { ackRequestSchema } from "@/lib/beregam/contracts";
 import { getBeregamService } from "@/lib/beregam/services/beregam-service";
@@ -52,14 +52,17 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         .where(eq(beregamOutbox.id, id));
 
       // Catat ke riwayat supaya muncul di inbox petugas dan terhitung
-      // dalam pembatas laju.
-      const payload = baris.payload as { text?: string } | null;
+      // dalam pembatas laju. `source` disisipkan di payload saat pesan
+      // diantrekan (lihat openwa-driver.ts) - di sinilah nilainya dibaca
+      // kembali, supaya inbox bisa membedakan balasan bot, FAQ, dan petugas.
+      const payload = baris.payload as { text?: string; source?: SumberPesan | null } | null;
       await getBeregamService().catatPesan({
         contactId: baris.contactId,
         direction: "out",
         waMessageId: data.waMessageId ?? null,
         type: baris.type,
         body: payload?.text ?? null,
+        source: payload?.source ?? null,
         sentBy: baris.sentBy,
       });
 

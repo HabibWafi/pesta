@@ -20,6 +20,7 @@ import {
 } from "../db/queries";
 import { getConfig } from "../config";
 import { getGateway } from "../drivers";
+import { ambilPesan } from "../pesan";
 import { formatWib, komponenWib, samarkanNomor, tambahMenit } from "@/lib/waktu";
 
 /**
@@ -54,13 +55,6 @@ function deskripsiJamLayanan(): string {
   const jam = (j: number) => `${String(j).padStart(2, "0")}.00`;
   return `${hari}, ${jam(jamBuka)}-${jam(jamTutup)} WIB`;
 }
-
-const SAPAAN =
-  "Halo, selamat datang! 👋\n" +
-  "Saya *Beregam*, asisten virtual Pelayanan Statistik Terpadu BPS Kabupaten Musi Rawas.\n\n" +
-  "Saya balasan otomatis, siap membantu kapan saja. Untuk mengobrol langsung, " +
-  "petugas kami hadir di hari dan jam kerja.\n" +
-  "Percakapan ini kami simpan untuk keperluan layanan.";
 
 export class BeregamService {
   private gateway = getGateway();
@@ -124,13 +118,7 @@ export class BeregamService {
         .update(beregamContacts)
         .set({ optedOutAt: new Date() })
         .where(eq(beregamContacts.id, contact.id));
-      await this.balas(
-        contact,
-        "Baik, kami hentikan balasan otomatis ke nomor ini ya. 👍\n\n" +
-          "Anda tetap bisa menghubungi Pelayanan Statistik Terpadu BPS " +
-          "Kabupaten Musi Rawas lewat telepon atau datang langsung kapan saja.",
-        "bot"
-      );
+      await this.balas(contact, await ambilPesan("opt_out"), "bot");
       return;
     }
 
@@ -272,13 +260,13 @@ export class BeregamService {
 
     const baris = pilihan.map((m) => `${m.menuKey}. ${m.title}`);
     const header = opsi.sapa
-      ? `${SAPAAN}\n\nSilakan pilih salah satu, cukup balas dengan *angka* ya:`
-      : "Mau lihat apa lagi? Balas dengan *angka* ya:";
+      ? `${await ambilPesan("sapaan")}\n\n${await ambilPesan("menu_intro")}`
+      : await ambilPesan("menu_intro_ulang");
 
     await this.gateway.queueMenu(contact.id, contact.waId, header, [
       ...baris,
       "",
-      "Ketik *menu* kapan saja untuk kembali ke daftar ini.",
+      await ambilPesan("menu_footer"),
     ], { source: "bot" });
 
     const sekarang = new Date();
@@ -320,8 +308,7 @@ export class BeregamService {
     await this.gateway.queueText(
       contact.id,
       contact.waId,
-      "Ada yang bisa dibantu lagi? Ketik *menu* untuk pilihan lainnya, atau " +
-        "*petugas* kalau ingin ngobrol langsung dengan staf kami. 😊",
+      await ambilPesan("menu_footer_jawaban"),
       { source: "bot", delaySeconds: 4 }
     );
 
@@ -345,13 +332,7 @@ export class BeregamService {
       return;
     }
 
-    await this.balas(
-      contact,
-      "Waduh, sepertinya saya belum menangkap maksud Anda. 🙏\n\n" +
-        "Coba ketik *menu* untuk melihat pilihan layanan, atau *petugas* " +
-        "kalau ingin langsung terhubung dengan staf kami.",
-      "bot"
-    );
+    await this.balas(contact, await ambilPesan("tidak_paham"), "bot");
 
     await db
       .update(beregamSessions)
@@ -420,12 +401,7 @@ export class BeregamService {
 
       await this.balas(
         contact,
-        `Saat ini di luar jam layanan kami (${deskripsiJamLayanan()}). 🕗\n\n` +
-          "Boleh ceritakan singkat apa yang ingin Anda tanyakan atau perlukan? " +
-          "Supaya begitu jam kerja mulai, petugas kami bisa langsung memahami " +
-          "dan merespons lebih cepat.\n\n" +
-          "Tenang, pesan Anda tetap kami sampaikan ke petugas sekarang juga " +
-          "kok, walau sedang di luar jam layanan. 🙏",
+        await ambilPesan("eskalasi_luar_jam", { jam_layanan: deskripsiJamLayanan() }),
         "bot"
       );
 
@@ -447,13 +423,7 @@ export class BeregamService {
         "Silakan buka WhatsApp Beregam untuk membalas warga tersebut."
     );
 
-    await this.balas(
-      contact,
-      "Siap! Saya sambungkan Anda ke petugas Pelayanan Statistik Terpadu ya. 🙋\n\n" +
-        "Mohon tunggu sebentar, pesan Anda sudah masuk ke antrean dan " +
-        "petugas akan segera membalas.",
-      "bot"
-    );
+    await this.balas(contact, await ambilPesan("eskalasi_jam_kerja"), "bot");
 
     console.info(
       `[beregam] eskalasi kontak=${samarkanNomor(contact.phone)} alasan="${alasan}"`
@@ -476,11 +446,7 @@ export class BeregamService {
       // Pesan tanpa teks yang lolos sampai sini (mis. cuma emoji yang
       // terbuang saat normalisasi) - diminta lagi, bukan diperlakukan
       // sebagai keterangan kosong yang tidak berguna bagi petugas.
-      await this.balas(
-        contact,
-        "Boleh dituliskan dalam beberapa kata saja ya, secukupnya. 🙏",
-        "bot"
-      );
+      await this.balas(contact, await ambilPesan("eskalasi_minta_ulang"), "bot");
       return;
     }
 
@@ -500,10 +466,7 @@ export class BeregamService {
 
     await this.balas(
       contact,
-      "Terima kasih, sudah kami sampaikan ke petugas ya. ✅\n\n" +
-        `Kami akan menghubungi Anda kembali begitu jam layanan dimulai (${deskripsiJamLayanan()}). ` +
-        "Kalau ada hal yang mendesak, petugas kami tetap dapat memantau pesan ini.\n\n" +
-        "Ketik *menu* kapan saja bila ingin melihat layanan lain sementara menunggu. 😊",
+      await ambilPesan("eskalasi_terima_konteks", { jam_layanan: deskripsiJamLayanan() }),
       "bot"
     );
 
@@ -617,14 +580,7 @@ export class BeregamService {
     };
     const sebutan = namaJenis[jenis] ?? "berkas";
 
-    await this.balas(
-      contact,
-      `Terima kasih sudah mengirim ${sebutan} 🙏, tapi saat ini saya baru bisa ` +
-        `membaca pesan *teks* saja.\n\n` +
-        "Coba tuliskan pertanyaan Anda ya, ketik *menu* untuk melihat pilihan " +
-        "layanan, atau *petugas* untuk bicara langsung dengan staf kami.",
-      "bot"
-    );
+    await this.balas(contact, await ambilPesan("bukan_teks", { jenis: sebutan }), "bot");
 
     await this.sentuhSesi(sesi.id);
   }

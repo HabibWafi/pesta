@@ -29,7 +29,11 @@ export class OpenWaDriver implements BeregamGateway {
     text: string,
     opts: OpsiKirim = {}
   ): Promise<BeregamOutbox> {
-    return this.antre(contactId, waId, "text", { text }, opts);
+    // `source` disisipkan ke payload supaya bisa ditelusuri sampai ke
+    // beregam_messages saat worker mengonfirmasi pengiriman (lihat
+    // /api/beregam/outbox/[id]/ack) - itulah yang membedakan balasan bot,
+    // FAQ, dan petugas di inbox percakapan admin.
+    return this.antre(contactId, waId, "text", { text, source: opts.source ?? null }, opts);
   }
 
   async queueMenu(
@@ -43,7 +47,13 @@ export class OpenWaDriver implements BeregamGateway {
     // interaktif WhatsApp tidak dipakai: dukungannya berbeda-beda antar
     // versi aplikasi, dan angka yang diketik selalu bisa dibaca semua orang.
     const teks = [header, "", ...items].join("\n");
-    return this.antre(contactId, waId, "menu", { text: teks, header, items }, opts);
+    return this.antre(
+      contactId,
+      waId,
+      "menu",
+      { text: teks, header, items, source: opts.source ?? null },
+      opts
+    );
   }
 
   private async antre(

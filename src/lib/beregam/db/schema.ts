@@ -496,6 +496,30 @@ export const beregamSinonim = mysqlTable(
 );
 
 // ---------------------------------------------------------------------------
+// 15. Pesan sistem yang bisa diedit admin
+//
+// Sapaan, "tidak paham", konfirmasi berhenti, dan naskah eskalasi -
+// sebelumnya ditulis tetap di beregam-service.ts. TERPISAH dari beregam_faq:
+// baris di sana adalah MENU bernomor yang dicocokkan warga ("balas dengan
+// angka"), baris di sini adalah naskah yang dikirim OTOMATIS oleh alur
+// percakapan, tidak pernah dipilih lewat angka.
+//
+// Kunci yang dikenal (dan naskah bawaannya) ada di src/lib/beregam/pesan.ts,
+// bukan di sini - tabel ini cuma penyimpanan. Baris yang belum ada di tabel
+// berarti admin belum pernah menimpa naskah bawaan untuk kunci itu.
+// ---------------------------------------------------------------------------
+export const beregamSettings = mysqlTable(
+  "beregam_settings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    kunci: varchar("kunci", { length: 60 }).notNull(),
+    nilai: text("nilai").notNull(),
+    updatedAt: diubah(),
+  },
+  (t) => [unique("beregam_settings_kunci_key").on(t.kunci)]
+);
+
+// ---------------------------------------------------------------------------
 // Tipe turunan
 // ---------------------------------------------------------------------------
 export type BeregamContact = InferSelectModel<typeof beregamContacts>;
@@ -513,5 +537,6 @@ export type BeregamAiJob = InferSelectModel<typeof beregamAiJobs>;
 export type BeregamAlert = InferSelectModel<typeof beregamAlerts>;
 export type BeregamHoliday = InferSelectModel<typeof beregamHolidays>;
 export type BeregamSinonim = InferSelectModel<typeof beregamSinonim>;
+export type BeregamSetting = InferSelectModel<typeof beregamSettings>;
 
 export type SumberPesan = (typeof SUMBER_PESAN)[number];

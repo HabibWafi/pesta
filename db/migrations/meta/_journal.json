@@ -43,6 +43,13 @@
       "when": 1787293251777,
       "tag": "0005_beregam_fondasi",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787369189991,
+      "tag": "0006_beregam_pesan_sistem",
+      "breakpoints": true
     }
   ]
 }

@@ -113,6 +113,7 @@ Migration yang dijalankan:
 | `0003_analitik_pengunjung` | Tabel `analytics_events`, `analytics_daily` |
 | `0004_analitik_per_halaman` | Tabel `analytics_path_daily` |
 | `0005_beregam_fondasi` | 14 tabel berprefiks `beregam_` untuk bot WhatsApp |
+| `0006_beregam_pesan_sistem` | Tabel `beregam_settings` - naskah pesan bot yang bisa diedit admin |
 
 > Migration **tidak pernah** dijalankan lewat CLI di server, dan **jangan**
 > membuat endpoint migration sekali-pakai di aplikasi. Endpoint semacam itu
@@ -125,10 +126,10 @@ Verifikasi setelah selesai:
 SHOW TABLES;
 ```
 
-Harus ada **24 tabel**: 10 tabel inti - `users`, `vidcon_requests`,
+Harus ada **25 tabel**: 10 tabel inti - `users`, `vidcon_requests`,
 `pengaduans`, `contacts`, `site_settings`, `testimonials`, `faqs`,
 `analytics_events`, `analytics_daily`, `analytics_path_daily` - ditambah
-14 tabel berprefiks `beregam_`.
+15 tabel berprefiks `beregam_`.
 
 > **Nilai bawaan waktu sengaja ditulis tanpa tanda kurung.** drizzle-kit
 > menghasilkan `DEFAULT (CURRENT_TIMESTAMP(3))`, bentuk "nilai bawaan berupa
