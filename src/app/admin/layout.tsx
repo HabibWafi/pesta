@@ -76,6 +76,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     checkAuth();
   }, [pathname, router]);
 
+  // Menutup sidebar mobile setiap kali berpindah halaman - tanpa ini,
+  // navigasi lewat sidebar mobile meninggalkan overlay-nya tetap terbuka
+  // menutupi halaman berikutnya.
+  //
+  // Disesuaikan langsung saat render ("adjusting state when a prop
+  // changes", pola yang disarankan React), bukan lewat useEffect - reset
+  // seperti ini tidak butuh menunggu commit selesai lebih dulu.
+  const [pathnameSebelumnya, setPathnameSebelumnya] = useState(pathname);
+  if (pathname !== pathnameSebelumnya) {
+    setPathnameSebelumnya(pathname);
+    setMobileOpen(false);
+  }
+
   // Toggle Theme Switcher
   const toggleTheme = () => {
     const nextTheme = theme === "light" ? "dark" : "light";
@@ -127,8 +140,82 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className={`min-h-screen flex selection:bg-indigo-500 selection:text-white transition-colors duration-300 ${
       theme === "dark" ? "bg-slate-950 text-slate-100 dark" : "bg-slate-100 text-slate-900"
     }`}>
+      {/*
+        Sidebar mobile: overlay + panel yang meluncur dari kiri.
+
+        SEBELUM INI, tombol hamburger di header hanya mengubah state
+        `mobileOpen` tanpa ada elemen apa pun yang membacanya - sidebar
+        desktop di bawah selalu `hidden` di bawah breakpoint `lg`, jadi
+        menekan tombolnya di ponsel terlihat tidak melakukan apa-apa sama
+        sekali. Seluruh navigasi admin lewat ponsel akibatnya tidak bisa
+        dipakai kecuali mengetik URL manual.
+      */}
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <button
+            aria-label="Tutup menu"
+            onClick={() => setMobileOpen(false)}
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+          />
+          <div className="relative w-72 max-w-[85vw] h-full bg-slate-900 text-white flex flex-col justify-between p-5 shadow-2xl">
+            <div>
+              <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-800/80">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white p-0.5 shadow-md flex items-center justify-center shrink-0">
+                    <Image
+                      src="/images/pesta_logo.png"
+                      alt="Logo PESTA BPS"
+                      width={36}
+                      height={36}
+                      className="object-contain w-full h-full rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <h2 className="font-extrabold text-base tracking-tight text-white">PESTA Admin</h2>
+                    <p className="text-[10px] text-slate-400 font-medium">BPS Musi Rawas</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMobileOpen(false)}
+                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                  aria-label="Tutup menu"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <nav className="space-y-2">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const active = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={`flex items-center gap-3 px-3.5 py-3 rounded-2xl text-xs font-bold transition-all ${
+                        active
+                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{item.name}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800 text-center">
+              <p className="text-[10px] text-slate-500 font-medium">&copy; 2026 BPS Musi Rawas &bull; PESTA Digital</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar Desktop (Fixed Sticky Screen Height) */}
-      <aside 
+      <aside
         className={`hidden lg:flex flex-col justify-between p-5 border-r h-screen sticky top-0 z-40 transition-all duration-300 ${
           isCollapsed ? "w-20" : "w-64"
         } ${
@@ -226,10 +313,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
-
-            <h1 className="text-sm font-bold hidden sm:block">
-              Panel Pengelola PESTA Digital Musi Rawas
-            </h1>
           </div>
 
           {/* Right Actions: Theme Toggle + User Profile + Web Utama + Logout */}
