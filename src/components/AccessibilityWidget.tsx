@@ -29,6 +29,7 @@ import {
   Link2,
   Heading,
   BookOpen,
+  Check,
 } from "lucide-react";
 import {
   BAWAAN,
@@ -239,15 +240,39 @@ export default function AccessibilityWidget() {
     const profil = PROFIL.find((x) => x.kunci === kunci);
     if (!profil) return;
 
-    const sudahAktif = profilAktif(p, kunci);
-    setP((lama) =>
-      sudahAktif
-        ? // Mematikan profil mengembalikan HANYA penyesuaian yang dinyalakannya,
-          // bukan mereset seluruh panel - pengunjung mungkin sudah mengubah
-          // saklar lain sendiri, dan itu tidak boleh ikut hilang.
-          { ...lama, ...balikkan(profil.ubah) }
-        : { ...lama, ...profil.ubah }
+    if (!profilAktif(p, kunci)) {
+      setP((lama) => ({ ...lama, ...profil.ubah }));
+      return;
+    }
+
+    /*
+     * Mematikan profil TIDAK boleh asal mengembalikan seluruh penyesuaiannya
+     * ke bawaan.
+     *
+     * Beberapa profil berbagi penyesuaian yang sama - "Tunanetra" dan
+     * "Keterbatasan Motorik" sama-sama menyalakan fokus tegas dan sorot
+     * tautan. Sebelum diperbaiki, mematikan salah satunya ikut mematikan
+     * milik yang lain: profil kedua mendadak berhenti aktif tanpa pernah
+     * disentuh, dan sebagian penyesuaiannya tertinggal menyala tanpa ada
+     * profil mana pun yang bisa mematikannya.
+     *
+     * Jadi untuk tiap penyesuaian: kalau masih ada profil lain yang aktif dan
+     * membutuhkannya, ikuti nilai profil itu; kalau tidak ada, baru
+     * dikembalikan ke bawaan.
+     */
+    const profilLain = PROFIL.filter(
+      (x) => x.kunci !== kunci && profilAktif(p, x.kunci)
     );
+
+    const kembali: Partial<Pengaturan> = {};
+    for (const k of Object.keys(profil.ubah) as (keyof Pengaturan)[]) {
+      const pemilikLain = profilLain.find((l) => k in l.ubah);
+      (kembali[k] as Pengaturan[typeof k]) = pemilikLain
+        ? (pemilikLain.ubah[k] as Pengaturan[typeof k])
+        : BAWAAN[k];
+    }
+
+    setP((lama) => ({ ...lama, ...kembali }));
   };
 
   const resetSemua = () => {
@@ -349,16 +374,27 @@ export default function AccessibilityWidget() {
                             {profil.keterangan}
                           </p>
                         </div>
-                        <span
-                          className={`w-11 h-6 rounded-full p-1 shrink-0 transition-colors ${
-                            aktif ? "bg-indigo-600" : "bg-slate-300"
-                          }`}
-                        >
+                        {/*
+                          Sama seperti ubin: keadaan profil ditandai TEKS,
+                          bukan hanya posisi dan warna sakelar. Di mode
+                          kontras, sakelar menyala dan mati berwarna sama
+                          persis.
+                        */}
+                        <span className="shrink-0 flex flex-col items-center gap-1">
                           <span
-                            className={`block w-4 h-4 rounded-full bg-white transition-transform ${
-                              aktif ? "translate-x-5" : ""
+                            className={`w-11 h-6 rounded-full p-1 transition-colors ${
+                              aktif ? "bg-indigo-600" : "bg-slate-300"
                             }`}
-                          />
+                          >
+                            <span
+                              className={`block w-4 h-4 rounded-full bg-white transition-transform ${
+                                aktif ? "translate-x-5" : ""
+                              }`}
+                            />
+                          </span>
+                          <span className="text-[9px] font-extrabold uppercase tracking-wide">
+                            {aktif ? "Aktif" : "Mati"}
+                          </span>
                         </span>
                       </button>
                     );
@@ -634,12 +670,30 @@ function Ubin({
     <button
       onClick={onClick}
       aria-pressed={aktif}
-      className={`aspect-square rounded-2xl border flex flex-col items-center justify-center gap-1.5 p-2 text-center transition-colors ${
+      className={`relative aspect-square rounded-2xl border flex flex-col items-center justify-center gap-1.5 p-2 text-center transition-colors ${
         aktif
           ? "bg-indigo-600 border-indigo-600 text-white"
           : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
       }`}
     >
+      {/*
+        Tanda aktif berupa BENTUK, bukan sekadar warna latar.
+
+        Mode kontras memaksa seluruh tombol memakai warna yang sama, sehingga
+        ubin menyala dan ubin mati menjadi identik - pengunjung tidak lagi bisa
+        melihat penyesuaian mana yang sedang aktif, apalagi mematikannya.
+        Justru pengunjung yang paling membutuhkan mode kontras yang paling
+        dirugikan. Ini juga inti WCAG 1.4.1: informasi tidak boleh disampaikan
+        lewat warna saja.
+      */}
+      {aktif && (
+        <span
+          aria-hidden="true"
+          className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-white text-indigo-700 border border-indigo-700 flex items-center justify-center"
+        >
+          <Check className="w-3 h-3" strokeWidth={4} />
+        </span>
+      )}
       {ikon}
       <span className="text-[10px] font-bold leading-tight">{label}</span>
     </button>
@@ -659,14 +713,6 @@ function profilAktif(p: Pengaturan, kunci: KunciProfil): boolean {
   );
 }
 
-/** Nilai bawaan untuk setiap kunci yang disentuh sebuah profil. */
-function balikkan(ubah: Partial<Pengaturan>): Partial<Pengaturan> {
-  const hasil: Partial<Pengaturan> = {};
-  for (const k of Object.keys(ubah) as (keyof Pengaturan)[]) {
-    (hasil[k] as Pengaturan[typeof k]) = BAWAAN[k];
-  }
-  return hasil;
-}
 
 /** Berapa penyesuaian yang sedang menyala - dipakai untuk lencana di tombol. */
 function hitungAktif(p: Pengaturan): number {
