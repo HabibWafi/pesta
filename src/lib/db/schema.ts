@@ -109,6 +109,15 @@ export const vidconRequests = mysqlTable("vidcon_requests", {
   /** Penjelasan bebas bila memilih LAINNYA. */
   layananInklusifCatatan: text("layanan_inklusif_catatan"),
 
+  /**
+   * Kanal masuknya permohonan: WEB | WHATSAPP.
+   *
+   * Beregam (bot WhatsApp) mengisi tabel yang sama persis dengan formulir
+   * web - satu antrean kerja bagi petugas, bukan dua. Kolom ini semata
+   * penanda asal, tidak memengaruhi cara permohonan diproses.
+   */
+  sumber: varchar("sumber", { length: 20 }).default("WEB").notNull(),
+
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -130,6 +139,41 @@ export const pengaduans = mysqlTable("pengaduans", {
   status: varchar("status", { length: 20 }).default("PENDING").notNull(),
   /** Balasan atau tindak lanjut petugas BPS */
   tanggapan: text("tanggapan"),
+  /** Kanal masuknya aduan: WEB | WHATSAPP. Lihat catatan di vidconRequests. */
+  sumber: varchar("sumber", { length: 20 }).default("WEB").notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+// ---------------------------------------------------------------------------
+// 3b. Permintaan data statistik ke kantor
+//
+// Berbeda dari ViDCon (konsultasi/diskusi terjadwal) dan dari tautan keluar
+// ke portal BPS Pusat/SILASTIK (menjelajah publikasi yang sudah terbit) -
+// ini permohonan DATA SPESIFIK yang belum tentu tersedia di publikasi, dan
+// harus diproses satu per satu oleh petugas PST.
+// ---------------------------------------------------------------------------
+export const permintaanData = mysqlTable("permintaan_data", {
+  id: int("id").autoincrement().primaryKey(),
+  nama: varchar("nama", { length: 255 }).notNull(),
+  asalInstansi: varchar("asal_instansi", { length: 255 }).notNull(),
+  alamat: text("alamat").notNull(),
+  noHp: varchar("no_hp", { length: 50 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  /** Data/tabel apa yang diminta, mis. "PDRB per kecamatan 2023" */
+  jenisData: varchar("jenis_data", { length: 255 }).notNull(),
+  /** Untuk keperluan apa data ini akan dipakai */
+  keperluan: text("keperluan").notNull(),
+  /** SOFT_FILE | HARD_COPY | KUNJUNGAN_LANGSUNG */
+  formatDiinginkan: varchar("format_diinginkan", { length: 30 })
+    .default("SOFT_FILE")
+    .notNull(),
+  catatan: text("catatan"),
+  /** PENDING | DIPROSES | SELESAI | DITOLAK */
+  status: varchar("status", { length: 20 }).default("PENDING").notNull(),
+  catatanAdmin: text("catatan_admin"),
+  /** Kanal masuknya permintaan: WEB | WHATSAPP. */
+  sumber: varchar("sumber", { length: 20 }).default("WEB").notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -318,6 +362,9 @@ export type NewVidconRequest = InferInsertModel<typeof vidconRequests>;
 
 export type Pengaduan = InferSelectModel<typeof pengaduans>;
 export type NewPengaduan = InferInsertModel<typeof pengaduans>;
+
+export type PermintaanData = InferSelectModel<typeof permintaanData>;
+export type NewPermintaanData = InferInsertModel<typeof permintaanData>;
 
 export type ContactMessage = InferSelectModel<typeof contacts>;
 export type NewContactMessage = InferInsertModel<typeof contacts>;

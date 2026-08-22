@@ -1,16 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { 
+import {
   Download,
-  Video, 
-  Search, 
+  Database,
+  Search,
   Filter,
   Trash2,
   Edit3,
   X,
-  Clock,
-  Calendar,
   Phone,
   Building,
   MessageCircle,
@@ -19,53 +17,50 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmModal from "@/components/ui/ConfirmModal";
-import type { VidconRequest } from "@/lib/db/schema";
-import { labelInklusif } from "@/lib/schemas/inklusi";
+import type { PermintaanData } from "@/lib/db/schema";
+import { FORMAT_DATA_LABEL, type FormatData } from "@/lib/schemas/permintaan-data";
 
-type SortField = "nama" | "cakupan" | "tanggal" | "status";
+type SortField = "nama" | "jenisData" | "status";
 type SortOrder = "asc" | "desc";
 
-export default function AdminVidconPage() {
-  const [items, setItems] = useState<VidconRequest[]>([]);
+export default function AdminPermintaanDataPage() {
+  const [items, setItems] = useState<PermintaanData[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [selectedItem, setSelectedItem] = useState<VidconRequest | null>(null);
-  const [editStatus, setEditStatus] = useState("APPROVED");
+  const [selectedItem, setSelectedItem] = useState<PermintaanData | null>(null);
+  const [editStatus, setEditStatus] = useState("DIPROSES");
   const [catatan, setCatatan] = useState("");
   const [updating, setUpdating] = useState(false);
 
-  // Sorting State
-  const [sortField, setSortField] = useState<SortField>("tanggal");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [sortField, setSortField] = useState<SortField>("nama");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
 
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Custom Delete Modal State
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const fetchVidcon = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
       const query = new URLSearchParams();
       if (statusFilter !== "ALL") query.append("status", statusFilter);
       if (search) query.append("q", search);
 
-      const res = await fetch(`/api/admin/vidcon?${query.toString()}`);
+      const res = await fetch(`/api/admin/permintaan-data?${query.toString()}`);
       const data = await res.json();
       if (data.success) {
         setItems(data.items);
       }
     } catch (err) {
       toast.error("Gagal Memuat Data", {
-        description: "Terjadi kendala saat mengambil daftar permohonan ViDCon.",
+        description: "Terjadi kendala saat mengambil daftar permintaan data.",
       });
     } finally {
       setLoading(false);
@@ -73,17 +68,16 @@ export default function AdminVidconPage() {
   };
 
   useEffect(() => {
-    fetchVidcon();
+    fetchData();
     setCurrentPage(1);
   }, [statusFilter]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1);
-    fetchVidcon();
+    fetchData();
   };
 
-  // Toggle Sorting
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -93,14 +87,8 @@ export default function AdminVidconPage() {
     }
   };
 
-  // Sorted Items
   const sortedItems = useMemo(() => {
-    // Semua medan sortir di halaman ini bertipe teks (nama, cakupan,
-    // tanggal sebagai string YYYY-MM-DD, status), jadi cukup dibandingkan
-    // sebagai teks tanpa peka huruf besar-kecil.
-    const kunci = (item: VidconRequest): string =>
-      String(item[sortField] ?? "").toLowerCase();
-
+    const kunci = (item: PermintaanData): string => String(item[sortField] ?? "").toLowerCase();
     return [...items].sort((a, b) => {
       const aVal = kunci(a);
       const bVal = kunci(b);
@@ -110,7 +98,6 @@ export default function AdminVidconPage() {
     });
   }, [items, sortField, sortOrder]);
 
-  // Paginated Items
   const totalItems = sortedItems.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const paginatedItems = useMemo(() => {
@@ -118,7 +105,7 @@ export default function AdminVidconPage() {
     return sortedItems.slice(start, start + itemsPerPage);
   }, [sortedItems, currentPage]);
 
-  const openEditModal = (item: any) => {
+  const openEditModal = (item: PermintaanData) => {
     setSelectedItem(item);
     setEditStatus(item.status);
     setCatatan(item.catatanAdmin || "");
@@ -128,27 +115,23 @@ export default function AdminVidconPage() {
     if (!selectedItem) return;
     setUpdating(true);
     try {
-      const res = await fetch("/api/admin/vidcon", {
+      const res = await fetch("/api/admin/permintaan-data", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: selectedItem.id,
-          status: editStatus,
-          catatanAdmin: catatan,
-        }),
+        body: JSON.stringify({ id: selectedItem.id, status: editStatus, catatanAdmin: catatan }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message);
 
-      toast.success("Status Permohonan Berhasil Diperbarui", {
-        description: `Permohonan atas nama ${selectedItem.nama} telah disesuaikan menjadi ${editStatus}.`,
+      toast.success("Status Permintaan Data Berhasil Diperbarui", {
+        description: `Permintaan atas nama ${selectedItem.nama} telah disesuaikan menjadi ${editStatus}.`,
       });
       setSelectedItem(null);
-      fetchVidcon();
-    } catch (err: any) {
-      toast.error("Gagal Memperbarui Permohonan", {
-        description: err.message || "Mohon periksa kembali isian data Anda.",
+      fetchData();
+    } catch (err) {
+      toast.error("Gagal Memperbarui Permintaan", {
+        description: err instanceof Error ? err.message : "Mohon periksa kembali isian data Anda.",
       });
     } finally {
       setUpdating(false);
@@ -159,18 +142,18 @@ export default function AdminVidconPage() {
     if (!deleteTargetId) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/admin/vidcon?id=${deleteTargetId}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/permintaan-data?id=${deleteTargetId}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message);
 
-      toast.success("Permohonan Berhasil Dihapus", {
-        description: "Data permohonan ViDCon telah berhasil dihapus dari daftar layanan.",
+      toast.success("Permintaan Data Berhasil Dihapus", {
+        description: "Data permintaan telah berhasil dihapus dari daftar layanan.",
       });
       setDeleteTargetId(null);
-      fetchVidcon();
-    } catch (err: any) {
+      fetchData();
+    } catch (err) {
       toast.error("Gagal Menghapus Data", {
-        description: err.message || "Terjadi kendala saat menghapus data permohonan.",
+        description: err instanceof Error ? err.message : "Terjadi kendala saat menghapus data permintaan.",
       });
     } finally {
       setDeleting(false);
@@ -181,11 +164,11 @@ export default function AdminVidconPage() {
     switch (status) {
       case "PENDING":
         return <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 font-bold text-[10px]">PENDING</span>;
-      case "APPROVED":
-        return <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300 font-bold text-[10px]">DISETUJUI</span>;
-      case "COMPLETED":
+      case "DIPROSES":
+        return <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 font-bold text-[10px]">DIPROSES</span>;
+      case "SELESAI":
         return <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 font-bold text-[10px]">SELESAI</span>;
-      case "REJECTED":
+      case "DITOLAK":
         return <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300 font-bold text-[10px]">DITOLAK</span>;
       default:
         return <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 font-bold text-[10px]">{status}</span>;
@@ -210,7 +193,7 @@ export default function AdminVidconPage() {
     );
 
   const renderSortHeader = (label: string, field: SortField, className = "") => (
-    <th 
+    <th
       onClick={() => handleSort(field)}
       className={`p-3.5 cursor-pointer select-none hover:bg-slate-100/80 dark:hover:bg-slate-800/80 transition-colors ${className}`}
     >
@@ -227,33 +210,31 @@ export default function AdminVidconPage() {
 
   return (
     <div className="space-y-6">
-      {/* Custom Confirmation Popup Modal */}
       <ConfirmModal
         isOpen={deleteTargetId !== null}
         onClose={() => setDeleteTargetId(null)}
         onConfirm={handleConfirmDelete}
-        title="Hapus Permohonan ViDCon?"
-        message="Apakah Anda yakin ingin menghapus data permohonan ini? Data yang dihapus tidak dapat dikembalikan."
-        confirmText="Ya, Hapus Permohonan"
+        title="Hapus Permintaan Data?"
+        message="Apakah Anda yakin ingin menghapus data permintaan ini? Data yang dihapus tidak dapat dikembalikan."
+        confirmText="Ya, Hapus Permintaan"
         cancelText="Batal"
         variant="danger"
         loading={deleting}
       />
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-            <Video className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-            Kelola Permohonan ViDCon
+            <Database className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            Kelola Permintaan Data
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Daftar permohonan konsultasi statistik virtual BPS Musi Rawas (Total: {totalItems} Permohonan)
+            Permintaan data statistik dari web PESTA dan bot WhatsApp Beregam (Total: {totalItems})
           </p>
         </div>
 
         <a
-          href="/api/admin/ekspor?jenis=vidcon"
+          href="/api/admin/ekspor?jenis=permintaan-data"
           className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-xs inline-flex items-center gap-2 shrink-0"
           title="Unduh seluruh data sebagai berkas CSV"
         >
@@ -261,15 +242,14 @@ export default function AdminVidconPage() {
         </a>
       </div>
 
-      {/* Filters & Search */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center">
         <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-80">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari nama, instansi, email..."
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            placeholder="Cari nama, instansi, email, jenis data..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
           <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-2.5" />
         </form>
@@ -284,22 +264,21 @@ export default function AdminVidconPage() {
           >
             <option value="ALL">Semua Status</option>
             <option value="PENDING">Pending</option>
-            <option value="APPROVED">Disetujui</option>
-            <option value="COMPLETED">Selesai</option>
-            <option value="REJECTED">Ditolak</option>
+            <option value="DIPROSES">Diproses</option>
+            <option value="SELESAI">Selesai</option>
+            <option value="DITOLAK">Ditolak</option>
           </select>
         </div>
       </div>
 
-      {/* Datatable with High Contrast Dark Mode */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md overflow-hidden">
         <div className="w-full overflow-x-auto">
           <table className="w-full text-left text-xs table-fixed border-collapse min-w-[700px]">
             <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white">
               <tr>
                 {renderSortHeader("Pemohon", "nama", "w-[24%]")}
-                {renderSortHeader("Topik & Deskripsi", "cakupan", "w-[38%]")}
-                {renderSortHeader("Jadwal ViDCon", "tanggal", "w-[15%]")}
+                {renderSortHeader("Data yang Diminta", "jenisData", "w-[38%]")}
+                <th className="p-3.5 w-[15%] font-extrabold uppercase text-slate-900 dark:text-white text-[11px]">Format</th>
                 {renderSortHeader("Status", "status", "w-[11%]")}
                 <th className="p-3.5 text-right w-[12%] font-extrabold uppercase text-slate-900 dark:text-white text-[11px]">Aksi</th>
               </tr>
@@ -308,89 +287,64 @@ export default function AdminVidconPage() {
               {loading ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-slate-400 dark:text-slate-500">
-                    Memuat daftar permohonan...
+                    Memuat daftar permintaan...
                   </td>
                 </tr>
               ) : paginatedItems.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-slate-400 dark:text-slate-500">
-                    Belum ada data permohonan ViDCon.
+                    Belum ada permintaan data.
                   </td>
                 </tr>
               ) : (
                 paginatedItems.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/60 transition-colors">
-                    {/* Pemohon */}
                     <td className="p-3.5 overflow-hidden">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="font-bold text-slate-900 dark:text-white text-xs truncate" title={item.nama}>
                           {item.nama}
                         </p>
-                        {/*
-                          Dibaca dari kolom layanan_inklusif, bukan ditebak
-                          dari teks deskripsi. Tebakan lama itu penanganan
-                          darurat karena isian aslinya tidak pernah sampai
-                          ke database.
-                        */}
                         {getSumberBadge(item.sumber)}
-                        {labelInklusif(item.layananInklusif).map((label) => (
-                          <span
-                            key={label}
-                            className="px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-extrabold text-[9px] border border-emerald-300"
-                            title="Permohonan ini meminta pendampingan inklusif - beri prioritas"
-                          >
-                            {label}
-                          </span>
-                        ))}
                       </div>
                       <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-300 truncate mt-0.5" title={item.asalInstansi}>
-                        <Building className="w-3 h-3 text-indigo-500 dark:text-indigo-400 shrink-0" />
+                        <Building className="w-3 h-3 text-blue-500 dark:text-blue-400 shrink-0" />
                         <span className="truncate">{item.asalInstansi}</span>
                       </p>
                       <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-300 truncate mt-0.5" title={item.noHp}>
-                        <Phone className="w-3 h-3 text-indigo-500 dark:text-indigo-400 shrink-0" />
+                        <Phone className="w-3 h-3 text-blue-500 dark:text-blue-400 shrink-0" />
                         <span className="truncate">{item.noHp}</span>
                       </p>
                     </td>
 
-                    {/* Topik & Deskripsi */}
                     <td className="p-3.5 overflow-hidden">
-                      <span className="font-bold text-indigo-600 dark:text-indigo-400 block text-xs truncate mb-0.5" title={item.cakupan}>
-                        {item.cakupan}
+                      <span className="font-bold text-blue-600 dark:text-blue-400 block text-xs truncate mb-0.5" title={item.jenisData}>
+                        {item.jenisData}
                       </span>
                       <p className="text-slate-600 dark:text-slate-300 text-[11px] line-clamp-2 leading-relaxed break-words">
-                        {item.deskripsi}
+                        {item.keperluan}
                       </p>
                     </td>
 
-                    {/* Jadwal ViDCon */}
-                    <td className="p-3.5 whitespace-nowrap overflow-hidden space-y-0.5">
-                      <p className="font-semibold text-slate-900 dark:text-white text-[11px] flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" /> {item.tanggal}
-                      </p>
-                      <p className="text-slate-500 dark:text-slate-300 text-[11px] flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" /> {item.jam} WIB
-                      </p>
+                    <td className="p-3.5 overflow-hidden">
+                      <span className="text-slate-700 dark:text-slate-200 text-[11px] font-semibold">
+                        {FORMAT_DATA_LABEL[item.formatDiinginkan as FormatData] ?? item.formatDiinginkan}
+                      </span>
                     </td>
 
-                    {/* Status Badge */}
-                    <td className="p-3.5 whitespace-nowrap overflow-hidden">
-                      {getStatusBadge(item.status)}
-                    </td>
+                    <td className="p-3.5 whitespace-nowrap overflow-hidden">{getStatusBadge(item.status)}</td>
 
-                    {/* Actions */}
                     <td className="p-3.5 text-right whitespace-nowrap space-x-1">
                       <button
                         onClick={() => openEditModal(item)}
-                        className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-600 dark:hover:bg-indigo-600 text-indigo-600 dark:text-indigo-300 hover:text-white transition-colors"
-                        title="Ubah Status / Balas"
+                        className="p-1.5 rounded-xl bg-blue-50 dark:bg-blue-900/40 hover:bg-blue-600 dark:hover:bg-blue-600 text-blue-600 dark:text-blue-300 hover:text-white transition-colors"
+                        title="Ubah Status"
                       >
                         <Edit3 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setDeleteTargetId(item.id)}
                         className="p-1.5 rounded-xl bg-rose-50 dark:bg-rose-900/40 hover:bg-rose-600 dark:hover:bg-rose-600 text-rose-600 dark:text-rose-300 hover:text-white transition-colors"
-                        title="Hapus Permohonan"
+                        title="Hapus Permintaan"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -402,13 +356,12 @@ export default function AdminVidconPage() {
           </table>
         </div>
 
-        {/* High-Contrast Interactive Pagination Footer */}
         {!loading && totalItems > 0 && (
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs text-slate-700 dark:text-slate-200 font-semibold">
               Menampilkan <span className="font-extrabold text-slate-900 dark:text-white">{(currentPage - 1) * itemsPerPage + 1}</span> -{" "}
               <span className="font-extrabold text-slate-900 dark:text-white">{Math.min(currentPage * itemsPerPage, totalItems)}</span> dari{" "}
-              <span className="font-extrabold text-slate-900 dark:text-white">{totalItems}</span> permohonan
+              <span className="font-extrabold text-slate-900 dark:text-white">{totalItems}</span> permintaan
             </p>
 
             <div className="flex items-center gap-1.5">
@@ -433,7 +386,7 @@ export default function AdminVidconPage() {
                         onClick={() => setCurrentPage(p)}
                         className={`w-8 h-8 rounded-xl font-bold text-xs transition-all ${
                           currentPage === p
-                            ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                            ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
                             : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
                         }`}
                       >
@@ -456,12 +409,11 @@ export default function AdminVidconPage() {
         )}
       </div>
 
-      {/* Edit Status Modal */}
       {selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="font-bold text-slate-900 dark:text-white text-base">Ubah Status ViDCon</h3>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base">Ubah Status Permintaan</h3>
               <button onClick={() => setSelectedItem(null)} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
                 <X className="w-5 h-5" />
               </button>
@@ -471,38 +423,35 @@ export default function AdminVidconPage() {
               <p><strong className="text-slate-900 dark:text-white">Pemohon:</strong> {selectedItem.nama} ({selectedItem.asalInstansi})</p>
               <p><strong className="text-slate-900 dark:text-white">Kontak:</strong> {selectedItem.email} &middot; {selectedItem.noHp}</p>
               <p><strong className="text-slate-900 dark:text-white">Alamat:</strong> {selectedItem.alamat}</p>
-              <p><strong className="text-slate-900 dark:text-white">Jadwal:</strong> {selectedItem.tanggal} jam {selectedItem.jam} WIB</p>
-              <p><strong className="text-slate-900 dark:text-white">Topik:</strong> {selectedItem.cakupan}</p>
-              {labelInklusif(selectedItem.layananInklusif).length > 0 && (
-                <p className="pt-1 mt-1 border-t border-slate-200 dark:border-slate-700">
-                  <strong className="text-emerald-700 dark:text-emerald-400">Pendampingan inklusif:</strong>{" "}
-                  {labelInklusif(selectedItem.layananInklusif).join(", ")}
-                  {selectedItem.layananInklusifCatatan ? ` - ${selectedItem.layananInklusifCatatan}` : ""}
-                </p>
+              <p><strong className="text-slate-900 dark:text-white">Data diminta:</strong> {selectedItem.jenisData}</p>
+              <p><strong className="text-slate-900 dark:text-white">Keperluan:</strong> {selectedItem.keperluan}</p>
+              <p><strong className="text-slate-900 dark:text-white">Format:</strong> {FORMAT_DATA_LABEL[selectedItem.formatDiinginkan as FormatData] ?? selectedItem.formatDiinginkan}</p>
+              {selectedItem.catatan && (
+                <p><strong className="text-slate-900 dark:text-white">Catatan pemohon:</strong> {selectedItem.catatan}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">Status Permohonan</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">Status Permintaan</label>
               <select
                 value={editStatus}
                 onChange={(e) => setEditStatus(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-bold focus:outline-none"
               >
                 <option value="PENDING">PENDING (Menunggu Verifikasi)</option>
-                <option value="APPROVED">DISETUJUI (Jadwal Terkonfirmasi)</option>
-                <option value="COMPLETED">SELESAI (Konsultasi Berhasil)</option>
-                <option value="REJECTED">DITOLAK (Jadwal Penuh/Bentrokan)</option>
+                <option value="DIPROSES">DIPROSES (Sedang Disiapkan)</option>
+                <option value="SELESAI">SELESAI (Data Sudah Diserahkan)</option>
+                <option value="DITOLAK">DITOLAK</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">Catatan Petugas / Link Zoom</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">Catatan Petugas</label>
               <textarea
                 value={catatan}
                 onChange={(e) => setCatatan(e.target.value)}
                 rows={3}
-                placeholder="Tuliskan link pertemuan virtual atau penjelasan petugas BPS..."
+                placeholder="Tuliskan progres penyiapan data atau alasan penolakan..."
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none"
               />
             </div>
@@ -517,7 +466,7 @@ export default function AdminVidconPage() {
               <button
                 onClick={handleUpdateStatus}
                 disabled={updating}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 disabled:opacity-50"
               >
                 {updating ? "Simpan..." : "Simpan Perubahan"}
               </button>

@@ -22,6 +22,14 @@ import {
 import { getConfig } from "../config";
 import { getGateway } from "../drivers";
 import { ambilPesan } from "../pesan";
+import {
+  deskripsiJamLayanan,
+  FORM_INTRO_BAWAAN,
+  FORM_STEPS,
+  KATA_LEWATI,
+  submitForm,
+  type JenisForm,
+} from "../forms";
 import { formatWib, komponenWib, samarkanNomor, tambahMenit } from "@/lib/waktu";
 
 /**
@@ -49,29 +57,14 @@ const KATA_BERHENTI = ["stop", "berhenti", "unsubscribe", "hapus saya"];
  */
 const KATA_NILAI = ["nilai", "penilaian", "feedback", "masukan", "saran", "rating"];
 
-const KATA_LEWATI = ["lewati", "skip", "nanti", "tidak", "gak", "engga", "enggak"];
-
 /** Sesi menunggu warga menuliskan keperluannya (eskalasi di luar jam kerja). */
 const STATE_MENUNGGU_KONTEKS = "awaiting_escalation_reason";
 /** Sesi menunggu warga membalas angka 1-5 setelah percakapan diselesaikan. */
 const STATE_MENUNGGU_SKOR = "awaiting_rating_score";
 /** Skor sudah diterima, menunggu masukan tertulis yang sifatnya opsional. */
 const STATE_MENUNGGU_KOMENTAR = "awaiting_rating_comment";
-
-const NAMA_HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-
-/** Menyusun teks jam layanan dari konfigurasi, bukan ditulis tetap di tiga tempat. */
-function deskripsiJamLayanan(): string {
-  const { hariKerja, jamBuka, jamTutup } = getConfig().jamLayanan;
-  const urut = [...hariKerja].sort((a, b) => a - b);
-  const berurutan =
-    urut.length > 1 && urut.every((h, i) => i === 0 || h === urut[i - 1] + 1);
-  const hari = berurutan
-    ? `${NAMA_HARI[urut[0]]}-${NAMA_HARI[urut[urut.length - 1]]}`
-    : urut.map((h) => NAMA_HARI[h]).join(", ");
-  const jam = (j: number) => `${String(j).padStart(2, "0")}.00`;
-  return `${hari}, ${jam(jamBuka)}-${jam(jamTutup)} WIB`;
-}
+/** Sesi sedang mengisi formulir layanan (ViDCon, pengaduan, atau permintaan data). */
+const STATE_FORM = "filling_form";
 
 export class BeregamService {
   private gateway = getGateway();
@@ -191,6 +184,17 @@ export class BeregamService {
     // keperluan yang sudah susah payah diketik warga hilang begitu saja.
     if (sesi.state === STATE_MENUNGGU_KONTEKS) {
       await this.terimaKonteksEskalasi(contact, sesi, teks.trim());
+      return;
+    }
+
+    // --- LANGKAH 7c: mengisi formulir layanan -------------------------------
+    //
+    // Sama seperti LANGKAH 7b: diperiksa SEBELUM pagar kedaluwarsa. Formulir
+    // ViDCon punya sampai 10 langkah - warga wajar butuh waktu lebih lama
+    // dari 30 menit di antara satu-dua langkah, apalagi kalau harus mencari
+    // alamat email atau memikirkan uraian keperluannya.
+    if (sesi.state === STATE_FORM) {
+      await this.lanjutkanForm(contact, sesi, teks.trim(), bersih);
       return;
     }
 
@@ -342,6 +346,18 @@ export class BeregamService {
     // Menu "bicara dengan petugas" tidak punya jawaban - ia mengeskalasi.
     if (entri.answer.trim() === "[ESKALASI]") {
       await this.escalate(contact, `Menu ${angka}: ${entri.title}`);
+      return true;
+    }
+
+    // Menu yang membuka formulir (ViDCon, permintaan data, pengaduan).
+    // Baris pertama jawaban menandai jenisnya; sisanya (kalau ada) jadi
+    // sapaan pembuka kustom - admin tetap bisa menyunting kata-katanya
+    // dari panel tanpa menyentuh kode.
+    const cocokForm = entri.answer.trim().match(/^\[FORM:(vidcon|pengaduan|data)\]\s*([\s\S]*)$/);
+    if (cocokForm) {
+      const jenis = cocokForm[1] as JenisForm;
+      const introKustom = cocokForm[2].trim();
+      await this.mulaiForm(contact, sesi, jenis, introKustom || undefined);
       return true;
     }
 
@@ -524,6 +540,136 @@ export class BeregamService {
         expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),
       })
       .where(eq(beregamSessions.id, sesi.id));
+  }
+
+  // =========================================================================
+  // Formulir layanan langsung di chat (ViDCon, pengaduan, permintaan data)
+  // =========================================================================
+
+  /** Membuka formulir: kirim sapaan lalu pertanyaan pertama, simpan langkah=0 di context. */
+  private async mulaiForm(
+    contact: BeregamContact,
+    sesi: BeregamSession,
+    jenis: JenisForm,
+    introKustom?: string
+  ): Promise<void> {
+    const sekarang = new Date();
+    await db
+      .update(beregamSessions)
+      .set({
+        state: STATE_FORM,
+        context: { form: jenis, langkah: 0, jawaban: {} },
+        missCount: 0,
+        lastActivityAt: sekarang,
+        expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),
+      })
+      .where(eq(beregamSessions.id, sesi.id));
+
+    await this.balas(contact, introKustom || FORM_INTRO_BAWAAN[jenis], "bot");
+
+    const langkahPertama = FORM_STEPS[jenis][0];
+    await this.gateway.queueText(
+      contact.id,
+      contact.waId,
+      langkahPertama.pertanyaan({}, contact),
+      { source: "bot", delaySeconds: 3 }
+    );
+  }
+
+  /**
+   * Menerima satu jawaban langkah formulir yang sedang berjalan.
+   *
+   * Setiap langkah gagal SELALU menyebutkan jalan keluar (*batal*) di
+   * pesan error - warga tidak boleh merasa terjebak menjawab satu
+   * pertanyaan berulang-ulang tanpa tahu caranya berhenti. Kata kunci
+   * global (menu/batal/petugas) tetap diperiksa lebih dulu di
+   * handleIncoming, jadi tetap berfungsi membatalkan formulir kapan saja.
+   */
+  private async lanjutkanForm(
+    contact: BeregamContact,
+    sesi: BeregamSession,
+    teks: string,
+    bersih: string
+  ): Promise<void> {
+    const konteks = (sesi.context ?? {}) as {
+      form?: JenisForm;
+      langkah?: number;
+      jawaban?: Record<string, string>;
+    };
+    const jenis = konteks.form;
+
+    // Context rusak atau hilang (mis. sesi dibuat ulang manual) - jangan
+    // biarkan warga macet, kembalikan saja ke menu.
+    if (!jenis || !FORM_STEPS[jenis]) {
+      await this.kirimMenuUtama(contact, { ...sesi, state: "main_menu" }, { sapa: false });
+      return;
+    }
+
+    const langkahIdx = konteks.langkah ?? 0;
+    const jawabanSejauhIni = konteks.jawaban ?? {};
+    const langkah = FORM_STEPS[jenis][langkahIdx];
+    const lewati = Boolean(langkah.opsional) && KATA_LEWATI.includes(bersih);
+
+    let nilai = "";
+    if (!lewati) {
+      const hasil = langkah.proses(teks, bersih, contact);
+      if (!hasil.ok) {
+        await this.balas(
+          contact,
+          `${hasil.pesan}\n\nKetik *batal* untuk keluar dari formulir ini.`,
+          "bot"
+        );
+        await this.sentuhSesi(sesi.id);
+        return;
+      }
+      nilai = hasil.nilai;
+    }
+
+    const jawabanBaru = { ...jawabanSejauhIni, [langkah.field]: nilai };
+    const langkahBerikutnya = langkahIdx + 1;
+    const sekarang = new Date();
+
+    if (langkahBerikutnya >= FORM_STEPS[jenis].length) {
+      try {
+        const { id, pesan } = await submitForm(jenis, jawabanBaru);
+        await this.balas(contact, pesan, "bot");
+        console.info(
+          `[beregam] formulir ${jenis} #${id} dari kontak=${samarkanNomor(contact.phone)}`
+        );
+      } catch (error) {
+        console.error(`[beregam] gagal menyimpan formulir ${jenis}:`, error);
+        await this.balas(
+          contact,
+          "Mohon maaf, terjadi kendala teknis saat menyimpan formulir Anda. " +
+            "Silakan coba lagi beberapa saat, atau ketik *petugas* untuk dibantu langsung.",
+          "bot"
+        );
+      }
+
+      await db
+        .update(beregamSessions)
+        .set({
+          state: "main_menu",
+          context: null,
+          missCount: 0,
+          lastActivityAt: sekarang,
+          expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),
+        })
+        .where(eq(beregamSessions.id, sesi.id));
+      return;
+    }
+
+    await db
+      .update(beregamSessions)
+      .set({
+        context: { form: jenis, langkah: langkahBerikutnya, jawaban: jawabanBaru },
+        lastActivityAt: sekarang,
+        expiresAt: tambahMenit(getConfig().sessionTtlMinutes, sekarang),
+      })
+      .where(eq(beregamSessions.id, sesi.id));
+
+    const pertanyaanBerikutnya = FORM_STEPS[jenis][langkahBerikutnya].pertanyaan(jawabanBaru, contact);
+    await this.balas(contact, pertanyaanBerikutnya, "bot");
   }
 
   // =========================================================================

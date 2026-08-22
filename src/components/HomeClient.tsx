@@ -39,6 +39,9 @@ const ContactSection = dynamic(() => import("@/components/sections/ContactSectio
 
 const VidconModal = dynamic(() => import("@/components/modals/VidconModal"), { ssr: false });
 const PengaduanModal = dynamic(() => import("@/components/modals/PengaduanModal"), { ssr: false });
+const PermintaanDataModal = dynamic(() => import("@/components/modals/PermintaanDataModal"), {
+  ssr: false,
+});
 const AccessibilityWidget = dynamic(() => import("@/components/AccessibilityWidget"), {
   ssr: false,
 });
@@ -67,6 +70,7 @@ export interface KontenLanding {
 export default function HomeClient({ konten }: { konten: KontenLanding }) {
   const [vidconOpen, setVidconOpen] = useState(false);
   const [pengaduanOpen, setPengaduanOpen] = useState(false);
+  const [permintaanDataOpen, setPermintaanDataOpen] = useState(false);
 
   const { pengaturan } = konten;
 
@@ -82,6 +86,7 @@ export default function HomeClient({ konten }: { konten: KontenLanding }) {
         <ServicesSection
           onOpenVidcon={() => setVidconOpen(true)}
           onOpenPengaduan={() => setPengaduanOpen(true)}
+          onOpenPermintaanData={() => setPermintaanDataOpen(true)}
         />
         {konten.tampilInklusi && <InclusivitySection />}
         <SpecialServicesSection tahunSkd={konten.tahunSkd} />
@@ -110,6 +115,9 @@ export default function HomeClient({ konten }: { konten: KontenLanding }) {
         tombolnya benar-benar ditekan.
       */}
       {vidconOpen && <VidconModal isOpen onClose={() => setVidconOpen(false)} />}
+      {permintaanDataOpen && (
+        <PermintaanDataModal isOpen onClose={() => setPermintaanDataOpen(false)} />
+      )}
       {pengaduanOpen && (
         <PengaduanModal
           isOpen

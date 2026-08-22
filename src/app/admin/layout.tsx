@@ -22,7 +22,8 @@ import {
   Settings2,
   BarChart3,
   ShieldCheck,
-  Bot
+  Bot,
+  Database
 } from "lucide-react";
 import { toast } from "sonner";
 import LonengNotifikasi from "@/components/admin/LonengNotifikasi";
@@ -117,6 +118,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Permohonan ViDCon", href: "/admin/vidcon", icon: Video },
+    { name: "Permintaan Data", href: "/admin/permintaan-data", icon: Database },
     { name: "Pengaduan Publik", href: "/admin/pengaduan", icon: ShieldAlert },
     { name: "Pesan Kontak PST", href: "/admin/contact", icon: Mail },
     { name: "Statistik Pengunjung", href: "/admin/analytics", icon: BarChart3 },

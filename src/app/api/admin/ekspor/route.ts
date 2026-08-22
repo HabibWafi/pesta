@@ -1,6 +1,6 @@
 import { desc } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { contacts, pengaduans, vidconRequests } from "@/lib/db/schema";
+import { contacts, pengaduans, permintaanData, vidconRequests } from "@/lib/db/schema";
 import { getAdminSession } from "@/lib/auth";
 import { bangunCsv, responsCsv, stempelTanggal, type NilaiSel } from "@/lib/csv";
 import { labelInklusif } from "@/lib/schemas/inklusi";
@@ -60,6 +60,27 @@ export async function GET(req: Request) {
       return responsCsv(`aduan-pesta-${stempel}.csv`, isi);
     }
 
+    if (jenis === "permintaan-data") {
+      const baris = await db
+        .select()
+        .from(permintaanData)
+        .orderBy(desc(permintaanData.createdAt));
+
+      const isi = bangunCsv(
+        [
+          "id", "nama", "asal_instansi", "alamat", "no_hp", "email",
+          "jenis_data", "keperluan", "format_diinginkan", "catatan",
+          "status", "catatan_admin", "sumber", "dibuat",
+        ],
+        baris.map<NilaiSel[]>((v) => [
+          v.id, v.nama, v.asalInstansi, v.alamat, v.noHp, v.email,
+          v.jenisData, v.keperluan, v.formatDiinginkan, v.catatan,
+          v.status, v.catatanAdmin, v.sumber, v.createdAt,
+        ])
+      );
+      return responsCsv(`permintaan-data-pesta-${stempel}.csv`, isi);
+    }
+
     if (jenis === "kontak") {
       const baris = await db.select().from(contacts).orderBy(desc(contacts.createdAt));
 
@@ -73,7 +94,7 @@ export async function GET(req: Request) {
     }
 
     return new Response(
-      "Parameter 'jenis' harus salah satu dari: vidcon, aduan, kontak",
+      "Parameter 'jenis' harus salah satu dari: vidcon, aduan, permintaan-data, kontak",
       { status: 400 }
     );
   } catch (error) {

@@ -15,9 +15,10 @@ import {
 interface ServicesSectionProps {
   onOpenVidcon: () => void;
   onOpenPengaduan: () => void;
+  onOpenPermintaanData: () => void;
 }
 
-export default function ServicesSection({ onOpenVidcon, onOpenPengaduan }: ServicesSectionProps) {
+export default function ServicesSection({ onOpenVidcon, onOpenPengaduan, onOpenPermintaanData }: ServicesSectionProps) {
   const cards = [
     {
       badge: "Asisten Digital Cerdas",
@@ -60,6 +61,11 @@ export default function ServicesSection({ onOpenVidcon, onOpenPengaduan }: Servi
       buttonType: "external",
       buttonStyle: "bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300 shadow-sm",
       hasSparkle: false,
+      // Portal di atas untuk menjelajah publikasi yang sudah terbit. Tombol
+      // kedua ini untuk data spesifik yang belum tentu ada di publikasi -
+      // permintaan resmi yang masuk ke petugas PST, bukan tautan keluar.
+      secondaryButtonText: "Ajukan Permintaan Data",
+      secondaryButtonAction: onOpenPermintaanData,
     },
     {
       badge: "Masukan & Aspirasi",
@@ -135,7 +141,7 @@ export default function ServicesSection({ onOpenVidcon, onOpenPengaduan }: Servi
                 </div>
 
                 {/* Harmonized Button Actions */}
-                <div>
+                <div className="space-y-2">
                   {card.buttonType === "internal" ? (
                     <Link
                       href={card.buttonHref!}
@@ -160,6 +166,16 @@ export default function ServicesSection({ onOpenVidcon, onOpenPengaduan }: Servi
                       className={`w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs transition-all ${card.buttonStyle}`}
                     >
                       <span>{card.buttonText}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {card.secondaryButtonText && (
+                    <button
+                      onClick={card.secondaryButtonAction}
+                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs border border-blue-200 text-blue-700 hover:bg-blue-50 transition-all"
+                    >
+                      <span>{card.secondaryButtonText}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   )}

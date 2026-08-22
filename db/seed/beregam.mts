@@ -34,26 +34,15 @@ const MENU = [
   {
     menuKey: "2",
     title: "Permintaan data statistik",
-    answer:
-      "📊 Permintaan data dapat diajukan lewat portal PESTA:\n" +
-      "https://bpskabmusirawas.com\n\n" +
-      "[ISI: sebutkan jenis data yang tersedia, berkas apa yang perlu " +
-      "disiapkan pemohon, dan berapa lama pemrosesannya]\n\n" +
-      "Butuh bantuan langsung? Ketik *8* untuk terhubung dengan petugas kami.",
+    // Formulir langsung di chat - lihat src/lib/beregam/forms.ts. Baris
+    // kedua dan seterusnya (kalau ada) jadi sapaan pembuka, admin bebas
+    // menyuntingnya dari panel tanpa menyentuh kode.
+    answer: "[FORM:data]",
   },
   {
     menuKey: "3",
     title: "Konsultasi statistik (ViDCon)",
-    answer:
-      "💬 *ViDCon* adalah konsultasi statistik daring bersama petugas BPS, " +
-      "*100% gratis*.\n\n" +
-      "Daftar di: https://bpskabmusirawas.com\n\n" +
-      "Topik yang bisa dikonsultasikan antara lain data perekonomian, " +
-      "inflasi, kependudukan, metodologi survei, dan rekomendasi statistik.\n\n" +
-      "Konfirmasi jadwal dikirim maksimal 1x24 jam pada hari kerja.\n\n" +
-      "Butuh pendampingan khusus (juru bahasa isyarat, pendampingan lansia, " +
-      "dan lainnya)? Sebutkan saat mendaftar, petugas kami akan menyiapkannya " +
-      "dengan senang hati. 🤝",
+    answer: "[FORM:vidcon]",
   },
   {
     menuKey: "4",
@@ -92,13 +81,15 @@ const MENU = [
   {
     menuKey: "7",
     title: "Pengaduan & saran",
+    // Formulir langsung di chat. Kanal lain (SP4N-LAPOR!, WBS) tetap
+    // disebutkan untuk warga yang ingin melapor lewat jalur eksternal resmi.
     answer:
-      "📮 Sampaikan aduan atau saran Anda lewat:\n\n" +
-      "1. Form Aduan di https://bpskabmusirawas.com\n" +
-      "2. SP4N-LAPOR! di https://www.lapor.go.id\n" +
-      "3. Whistleblowing System BPS di https://webapps.bps.go.id/pengaduan/wbs/beranda\n\n" +
-      "Setiap aduan ditindaklanjuti oleh Staf Pengawas BPS Kabupaten Musi Rawas. " +
-      "Masukan Anda sangat berarti bagi kami. 🙏",
+      "[FORM:pengaduan]\n" +
+      "📮 Baik, saya bantu catat aduan/saran Anda di sini. Kanal lain yang " +
+      "juga tersedia: SP4N-LAPOR! (https://www.lapor.go.id) dan " +
+      "Whistleblowing System BPS " +
+      "(https://webapps.bps.go.id/pengaduan/wbs/beranda).\n\n" +
+      "Beberapa pertanyaan singkat ya. Ketik *batal* kapan saja untuk keluar.",
   },
   {
     menuKey: "8",

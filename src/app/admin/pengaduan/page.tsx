@@ -18,7 +18,9 @@ import {
   ChevronRight,
   Phone,
   Send,
-  ExternalLink
+  ExternalLink,
+  MessageCircle,
+  Globe
 } from "lucide-react";
 import { toast } from "sonner";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -252,6 +254,23 @@ export default function AdminPengaduanPage() {
     }
   };
 
+  const getSumberBadge = (sumber: string) =>
+    sumber === "WHATSAPP" ? (
+      <span
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-extrabold text-[9px] border border-emerald-300 shrink-0"
+        title="Masuk lewat bot WhatsApp Beregam"
+      >
+        <MessageCircle className="w-2.5 h-2.5" /> WA
+      </span>
+    ) : (
+      <span
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-extrabold text-[9px] border border-slate-300 dark:border-slate-600 shrink-0"
+        title="Masuk lewat formulir web PESTA"
+      >
+        <Globe className="w-2.5 h-2.5" /> Web
+      </span>
+    );
+
   const renderSortHeader = (label: string, field: SortField, className = "") => (
     <th 
       onClick={() => handleSort(field)}
@@ -367,6 +386,7 @@ export default function AdminPengaduanPage() {
                       <p className="font-bold text-slate-900 dark:text-white text-xs truncate flex items-center gap-1" title={item.nama}>
                         <User className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                         <span className="truncate">{item.nama}</span>
+                        {getSumberBadge(item.sumber)}
                       </p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-300 truncate flex items-center gap-1 mt-0.5" title={item.email}>
                         <Mail className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
