@@ -447,7 +447,9 @@ export class BeregamService {
     }
 
     const diLuarJam = !(await this.isJamLayanan());
-    const nomor = `+${contact.phone}`;
+    // Nomor bisa kosong pada pengalamatan LID - jangan menampilkan "+" sendirian
+    // yang terlihat seperti nomor rusak. Lihat src/lib/beregam/identitas.ts.
+    const nomor = contact.phone ? `+${contact.phone}` : "(nomor tidak terbaca, balas lewat inbox PESTA)";
     const waktu = formatWib(new Date());
 
     if (diLuarJam) {
@@ -524,7 +526,8 @@ export class BeregamService {
 
     await this.notifyStaff(
       `📝 *Keterangan dari pengunjung* (di luar jam layanan)\n\n` +
-        `Nomor: +${contact.phone}\nPesan: "${keterangan.slice(0, 300)}"\n\n` +
+        `Nomor: ${contact.phone ? `+${contact.phone}` : "(tidak terbaca, balas lewat inbox PESTA)"}\n` +
+          `Pesan: "${keterangan.slice(0, 300)}"\n\n` +
         "Balas langsung dari WhatsApp Beregam kalau dirasa penting, atau " +
         "tunggu sampai jam kerja berikutnya."
     );

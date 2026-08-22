@@ -30,9 +30,24 @@ import { getConfig } from "../config";
  */
 export async function findOrCreateContactByWaId(
   waId: string,
-  nama?: string | null
+  nama?: string | null,
+  nomorTelepon?: string
 ): Promise<BeregamContact> {
-  const phone = waId.replace(/[^0-9]/g, "").slice(0, 20);
+  /*
+   * `waId` BUKAN selalu nomor telepon.
+   *
+   * Sejak WhatsApp memakai pengalamatan LID, waId bisa berupa
+   * "190666499973242@lid" - angka buram yang bukan nomor siapa pun.
+   * Karena itu nomornya diterima sebagai parameter terpisah, hasil
+   * nomorAsli() di src/lib/beregam/identitas.ts.
+   *
+   * Bila pemanggil tidak menyediakannya, angka dari waId hanya dipakai
+   * kalau alamatnya memang BUKAN LID. Untuk LID, lebih baik kosong daripada
+   * angka yang menyamar jadi nomor telepon.
+   */
+  const phone = (nomorTelepon ?? (waId.includes("@lid") ? "" : waId.replace(/[^0-9]/g, "")))
+    .replace(/[^0-9]/g, "")
+    .slice(0, 20);
 
   const [ada] = await db
     .select()
@@ -41,6 +56,11 @@ export async function findOrCreateContactByWaId(
     .limit(1);
 
   if (ada) {
+    // Nomor asli baru diketahui belakangan? Perbaiki yang sudah tersimpan.
+    // Ini yang menyembuhkan sendiri kontak lama yang terlanjur menyimpan
+    // angka LID sebagai nomor telepon - tanpa perlu tindakan petugas.
+    const perluPerbaikanNomor = Boolean(phone) && phone !== ada.phone;
+
     await db
       .update(beregamContacts)
       .set({
@@ -48,10 +68,17 @@ export async function findOrCreateContactByWaId(
         messageCount: sql`${beregamContacts.messageCount} + 1`,
         // Nama profil WhatsApp bisa berubah; ikuti yang terbaru bila ada.
         ...(nama && nama !== ada.name ? { name: nama.slice(0, 120) } : {}),
+        ...(perluPerbaikanNomor ? { phone } : {}),
       })
       .where(eq(beregamContacts.id, ada.id));
 
-    return { ...ada, lastSeenAt: new Date(), messageCount: ada.messageCount + 1 };
+    return {
+      ...ada,
+      ...(perluPerbaikanNomor ? { phone } : {}),
+      ...(nama && nama !== ada.name ? { name: nama.slice(0, 120) } : {}),
+      lastSeenAt: new Date(),
+      messageCount: ada.messageCount + 1,
+    };
   }
 
   const sekarang = new Date();

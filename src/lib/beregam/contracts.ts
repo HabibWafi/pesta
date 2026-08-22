@@ -77,6 +77,39 @@ export const webhookPayloadSchema = z
         timestamp: z.number().optional(),
         notifyName: z.string().optional(),
         pushName: z.string().optional(),
+
+        /**
+         * Data mentah dari engine WhatsApp.
+         *
+         * PENTING - DI SINILAH NOMOR TELEPON ASLI BERADA saat WhatsApp
+         * memakai pengalamatan LID.
+         *
+         * WhatsApp kini kerap mengirim `from` berupa LID (mis.
+         * "190666499973242@lid"), bukan nomor telepon. LID adalah pengenal
+         * buram: bentuknya angka, panjangnya mirip nomor, tapi BUKAN nomor
+         * yang bisa dihubungi siapa pun. Nomor sungguhannya dititipkan di
+         * `key.remoteJidAlt` (mis. "6285228844884@s.whatsapp.net").
+         *
+         * Field opsional, jadi tidak menaikkan CONTRACTS_VERSION.
+         */
+        _data: z
+          .object({
+            key: z
+              .object({
+                remoteJid: z.string().optional(),
+                /** Nomor telepon asli, dipakai saat remoteJid berupa @lid. */
+                remoteJidAlt: z.string().optional(),
+                participant: z.string().optional(),
+                participantAlt: z.string().optional(),
+                /** "lid" bila pesan ini memakai pengalamatan LID. */
+                addressingMode: z.string().optional(),
+              })
+              .passthrough()
+              .optional(),
+            pushName: z.string().optional(),
+          })
+          .passthrough()
+          .optional(),
       })
       .passthrough()
       .optional(),

@@ -17,6 +17,7 @@
     "db:seed:beregam": "node --env-file=.env --import tsx db/seed/beregam.mts",
     "uji:beregam": "node db/uji/beregam.mjs",
     "uji:chunk": "node --import tsx db/uji/pemulihan-chunk.mts",
+    "perbaiki:nomor-lid": "node --env-file=.env --import tsx db/perbaiki/nomor-lid.mts",
     "buat:ikon": "node skrip/buat-ikon.mjs"
   },
   "dependencies": {

@@ -87,10 +87,35 @@ function validasiEmail(input: string) {
     : ({ ok: false, pesan: "format email belum tepat, contoh: nama@email.com" } as const);
 }
 
+/** Kata yang berarti "pakai saja nomor WhatsApp yang sedang dipakai mengobrol ini". */
+const KATA_NOMOR_SAMA = ["sama", "ya", "iya", "sama saja", "pakai ini", "nomor ini"];
+
 function validasiNoHp(input: string, bersih: string, contact: BeregamContact) {
-  if (["sama", "ya", "iya", "sama saja", "pakai ini", "nomor ini"].includes(bersih)) {
-    return { ok: true, nilai: contact.phone } as const;
+  // Tanda kutip sering ikut tersalin dari petunjuk ('isi "sama"'), jadi
+  // dibuang dulu - menolak jawaban yang maksudnya sudah benar hanya karena
+  // ada tanda kutip adalah cara yang bagus untuk membuat orang menyerah.
+  const tanpaKutip = bersih.replace(/["'`]/g, "").trim();
+
+  if (KATA_NOMOR_SAMA.includes(tanpaKutip)) {
+    /*
+     * Hanya bisa dipenuhi kalau nomor asli warga memang diketahui.
+     *
+     * Pada pengalamatan LID, `contact.phone` bisa kosong - dan mengisinya
+     * dengan angka LID akan menaruh nomor palsu ke permohonan resmi yang
+     * dipakai petugas untuk menghubungi warga. Lebih baik memintanya
+     * mengetik nomornya sendiri. Lihat src/lib/beregam/identitas.ts.
+     */
+    if (contact.phone && contact.phone.length >= 6) {
+      return { ok: true, nilai: contact.phone } as const;
+    }
+    return {
+      ok: false,
+      pesan:
+        "nomor WhatsApp Anda tidak terbaca otomatis, jadi mohon ketik nomornya " +
+        "langsung ya (mis. 081234567890)",
+    } as const;
   }
+
   const digitSaja = input.replace(/[^0-9]/g, "");
   if (digitSaja.length < 6) {
     return { ok: false, pesan: 'belum valid - tulis nomornya, atau isi "sama" untuk memakai nomor WhatsApp ini' } as const;
@@ -234,18 +259,37 @@ export const MEDAN_FORM: Record<JenisForm, MedanForm[]> = {
   ],
 };
 
-/** Keterangan tambahan di bawah format, per jenis. */
+/**
+ * Keterangan tambahan di bawah format, per jenis.
+ *
+ * TIDAK BOLEH ADA BARIS BERBENTUK "Label: isi" DI SINI.
+ *
+ * Warga menyalin SELURUH pesan format lalu mengirimkannya kembali - termasuk
+ * bagian petunjuk ini. Kalau petunjuknya ditulis "Format: 1=Berkas digital",
+ * penguraian akan membacanya sebagai isian Format dan menimpa jawaban warga
+ * yang sebenarnya. Itu benar-benar terjadi: nomor HP yang sudah diisi benar
+ * tertimpa kalimat petunjuk, dan pilihan Format diam-diam terisi dari
+ * petunjuk tanpa ada yang menyadarinya.
+ *
+ * Karena itu petunjuk selalu ditulis sebagai kalimat ("Kolom Format diisi
+ * angka - ..."), bukan berpasangan label-titik dua. Ada dua pagar lain di
+ * uraikanBalasan() sebagai lapis pengaman, tapi pagar pertama adalah tidak
+ * menulis ambiguitasnya sejak awal.
+ */
 const PETUNJUK: Record<JenisForm, string> = {
   vidcon:
-    `_Tanggal contoh: 25-08-2026. Jam contoh: 09:00 (hari kerja ${"{jam_layanan}"})._\n` +
-    '_No HP: tulis "sama" untuk memakai nomor WhatsApp ini._\n' +
-    '_Pendampingan: isi bila perlu juru bahasa isyarat, kursi roda, atau pendampingan lansia. Kalau tidak perlu, tulis "tidak"._',
+    `_Contoh tanggal 25-08-2026, contoh jam 09:00 (hari kerja ${"{jam_layanan}"})._\n` +
+    '_Kolom nomor HP boleh diisi "sama" untuk memakai nomor WhatsApp ini._\n' +
+    "_Kolom pendampingan diisi bila perlu juru bahasa isyarat, kursi roda, atau " +
+    'pendampingan lansia. Kalau tidak perlu, tulis "tidak"._',
   pengaduan:
-    "_Kategori: 1=Pelayanan PST, 2=Layanan ViDCon, 3=Publikasi & Data, 4=Sarana & Prasarana, 5=Lainnya._\n" +
-    '_Nama boleh diisi "Anonim". No HP boleh dikosongkan dengan tanda "-"._',
+    "_Kolom kategori diisi angka - 1=Pelayanan PST, 2=Layanan ViDCon, " +
+    "3=Publikasi & Data, 4=Sarana & Prasarana, 5=Lainnya._\n" +
+    '_Kolom nama boleh diisi "Anonim". Kolom nomor HP boleh dikosongkan dengan tanda "-"._',
   data:
-    "_Format: 1=Berkas digital, 2=Cetak, 3=Ambil langsung di kantor._\n" +
-    '_No HP: tulis "sama" untuk memakai nomor WhatsApp ini. Catatan boleh diisi "-"._',
+    "_Kolom format diisi angka - 1=Berkas digital, 2=Cetak, 3=Ambil langsung di kantor._\n" +
+    '_Kolom nomor HP boleh diisi "sama" untuk memakai nomor WhatsApp ini. ' +
+    'Kolom catatan boleh diisi "-"._',
 };
 
 const JUDUL: Record<JenisForm, string> = {
@@ -300,11 +344,42 @@ export function uraikanBalasan(jenis: JenisForm, teks: string): Record<string, s
 
   for (const barisMentah of teks.split("\n")) {
     const baris = barisMentah.trim();
+
+    /*
+     * PAGAR 1 - lewati baris petunjuk.
+     *
+     * Warga menyalin seluruh pesan format, jadi baris petunjuk kita sendiri
+     * ikut terkirim balik. Di WhatsApp petunjuk itu ditulis miring, yaitu
+     * diapit garis bawah - penanda yang tidak pernah dipakai warga saat
+     * mengisi. Baris seperti itu bukan jawaban siapa pun, jadi diabaikan
+     * sebelum sempat dicocokkan ke label mana pun.
+     */
+    if (baris.length > 2 && baris.startsWith("_") && baris.endsWith("_")) {
+      medanAktif = null;
+      continue;
+    }
+
     const posisi = baris.indexOf(":");
 
     if (posisi > 0) {
       const kandidat = medanPerLabel.get(normalkanLabel(baris.slice(0, posisi)));
       if (kandidat) {
+        /*
+         * PAGAR 2 - isian pertama yang menang, bukan yang terakhir.
+         *
+         * Dalam satu pesan, jawaban warga selalu muncul lebih dulu daripada
+         * baris petunjuk di bawahnya. Kalau ada label yang terbaca dua kali,
+         * yang lebih mungkin merupakan jawaban sungguhan adalah yang PERTAMA.
+         * Dulu yang terakhir menang, dan itulah yang membuat nomor HP asli
+         * tertimpa kalimat petunjuk.
+         *
+         * Tidak mengganggu alur ralat: ralat dikirim sebagai pesan BARU, dan
+         * penggabungannya ditangani periksaForm(), bukan di sini.
+         */
+        if (Object.prototype.hasOwnProperty.call(hasil, kandidat.field)) {
+          medanAktif = null;
+          continue;
+        }
         medanAktif = kandidat;
         hasil[kandidat.field] = baris.slice(posisi + 1).trim();
         continue;

@@ -53,9 +53,37 @@ function pesanWa(body, opsi = {}) {
       body,
       type: opsi.type ?? "text",
       timestamp: Math.floor((opsi.waktuMs ?? Date.now()) / 1000),
-      pushName: "Warga Uji",
+      // pushName sengaja bisa DIHILANGKAN: payload LID sungguhan dari WAHA
+      // tidak punya pushName di tingkat atas sama sekali - hanya di dalam
+      // _data. Itulah sebabnya seluruh kontak LID di produksi tersimpan
+      // tanpa nama.
+      ...(opsi.tanpaPushName ? {} : { pushName: opsi.pushName ?? "Warga Uji" }),
+      ...(opsi.data ? { _data: opsi.data } : {}),
     },
   };
+}
+
+/**
+ * Pesan dengan pengalamatan LID - bentuk yang benar-benar dikirim WhatsApp
+ * sekarang, disalin dari payload asli di produksi.
+ *
+ * `from` berupa angka LID yang BUKAN nomor telepon; nomor sungguhannya ada
+ * di _data.key.remoteJidAlt, dan nama profilnya di _data.pushName.
+ */
+function pesanWaLid(body, lid, nomorSungguhan, nama = "Warga Uji LID") {
+  return pesanWa(body, {
+    from: `${lid}@lid`,
+    tanpaPushName: true,
+    data: {
+      key: {
+        remoteJid: `${lid}@lid`,
+        remoteJidAlt: `${nomorSungguhan}@s.whatsapp.net`,
+        fromMe: false,
+        addressingMode: "lid",
+      },
+      pushName: nama,
+    },
+  });
 }
 
 async function webhook(payload, opsi = {}) {
@@ -681,6 +709,121 @@ async function main() {
   // Petugas tidak duduk memantau panel sepanjang hari. Tanpa pemberitahuan,
   // permohonan bisa mengendap berjam-jam tanpa ada yang tahu - dan warga
   // sudah telanjur diberi tahu bahwa permohonannya diterima.
+  // === Q. Pengalamatan LID: nomor telepon asli ============================
+  //
+  // WhatsApp kini kerap mengirim `from` berupa LID ("190666499973242@lid"),
+  // bukan nomor telepon. Angkanya panjang dan tampak seperti nomor, dan itu
+  // yang membuatnya berbahaya: sempat tersimpan sebagai nomor warga di inbox
+  // petugas, di notifikasi, dan lewat pintasan "sama" pada formulir - nomor
+  // yang kalau ditelepon petugas tidak akan pernah sampai ke siapa pun.
+  console.log("\nQ. PENGALAMATAN LID - NOMOR TELEPON ASLI");
+
+  const LID = "190666499973242";
+  const NOMOR_ASLI = "6285228844884";
+  sql(`DELETE FROM pesta.beregam_contacts WHERE wa_id='${LID}@lid';`);
+
+  await webhook(pesanWaLid("halo", LID, NOMOR_ASLI, "Novi Irawan"));
+  await jeda(500);
+
+  const kontakLid = sql(`SELECT id FROM pesta.beregam_contacts WHERE wa_id='${LID}@lid';`);
+  lapor("kontak LID dibuat", kontakLid !== "");
+  lapor(
+    "  nomor tersimpan adalah nomor ASLI, bukan angka LID",
+    sql(`SELECT phone FROM pesta.beregam_contacts WHERE id=${kontakLid};`) === NOMOR_ASLI
+  );
+  lapor(
+    "  nama profil terbaca dari _data (dulu selalu kosong pada LID)",
+    sql(`SELECT IFNULL(name,'') FROM pesta.beregam_contacts WHERE id=${kontakLid};`) === "Novi Irawan"
+  );
+
+  // Kontak lama yang terlanjur menyimpan angka LID harus sembuh sendiri
+  // begitu ada pesan berikutnya - tanpa perlu tindakan petugas.
+  sql(`UPDATE pesta.beregam_contacts SET phone='${LID}' WHERE id=${kontakLid};`);
+  await webhook(pesanWaLid("menu", LID, NOMOR_ASLI, "Novi Irawan"));
+  await jeda(500);
+  lapor(
+    "kontak lama bernomor LID sembuh sendiri saat ada pesan baru",
+    sql(`SELECT phone FROM pesta.beregam_contacts WHERE id=${kontakLid};`) === NOMOR_ASLI
+  );
+
+  // LID TANPA nomor alternatif: lebih baik kosong daripada angka palsu.
+  const LID2 = "555000111222333";
+  sql(`DELETE FROM pesta.beregam_contacts WHERE wa_id='${LID2}@lid';`);
+  await webhook(pesanWa("halo", { from: `${LID2}@lid` }));
+  await jeda(500);
+  lapor(
+    "LID tanpa nomor alternatif disimpan KOSONG, bukan angka LID yang menyamar",
+    sql(`SELECT IFNULL(phone,'') FROM pesta.beregam_contacts WHERE wa_id='${LID2}@lid';`) === ""
+  );
+
+  // Pintasan "sama" tidak boleh menaruh nomor palsu ke permohonan resmi.
+  sql(`UPDATE pesta.beregam_sessions SET state='main_menu', mode='bot', context=NULL WHERE contact_id=(SELECT id FROM pesta.beregam_contacts WHERE wa_id='${LID2}@lid');`);
+  await webhook(pesanWa("2", { from: `${LID2}@lid` }));
+  await jeda(400);
+  await webhook(pesanWa(
+    "Nama: Warga Uji Data Tanpa Nomor\nInstansi: Pribadi\nAlamat: Jl. Uji\n" +
+    "Email: tanpa.nomor@email.com\nNo HP: sama\nData diminta: PDRB\n" +
+    "Keperluan: Uji nomor tidak terbaca\nFormat: 1\nCatatan: -",
+    { from: `${LID2}@lid` }
+  ));
+  await jeda(600);
+
+  lapor(
+    "'sama' saat nomor tidak terbaca -> TIDAK menyimpan nomor palsu",
+    Number(sql(`SELECT COUNT(*) FROM pesta.permintaan_data WHERE nama='Warga Uji Data Tanpa Nomor';`)) === 0
+  );
+  lapor(
+    "  warga diminta mengetik nomornya sendiri, bukan dibiarkan bingung",
+    sql(`SELECT payload FROM pesta.beregam_outbox WHERE contact_id=(SELECT id FROM pesta.beregam_contacts WHERE wa_id='${LID2}@lid') ORDER BY id DESC LIMIT 1;`).includes("ketik nomornya")
+  );
+
+  sql(`DELETE FROM pesta.permintaan_data WHERE nama='Warga Uji Data Tanpa Nomor';`);
+  sql(`DELETE FROM pesta.beregam_contacts WHERE wa_id IN ('${LID}@lid','${LID2}@lid');`);
+
+  // === R. Petunjuk formulir tidak boleh terbaca sebagai jawaban ===========
+  //
+  // Warga menyalin SELURUH pesan format lalu mengirimkannya kembali, termasuk
+  // baris petunjuk kita sendiri. Petunjuk lama ditulis "No HP: tulis..." dan
+  // "Format: 1=Berkas digital...", sehingga terbaca sebagai isian dan
+  // MENIMPA jawaban warga. Nomor HP yang sudah benar jadi tertolak, dan
+  // pilihan Format diam-diam terisi dari petunjuk tanpa ada yang tahu.
+  console.log("\nR. PETUNJUK FORMULIR TIDAK BOLEH TERBACA SEBAGAI JAWABAN");
+
+  sql(`UPDATE pesta.beregam_sessions SET state='main_menu', mode='bot', context=NULL WHERE contact_id=${kontakId};`);
+  await webhook(pesanWa("2"));
+  await jeda(400);
+
+  const formatDikirim = sql(`SELECT payload FROM pesta.beregam_outbox WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`);
+  lapor(
+    "tidak ada baris petunjuk yang berbentuk 'Label: isi'",
+    !/_(No HP|Format|Kategori|Nama|Catatan|Tanggal|Jam|Pendampingan):/i.test(formatDikirim)
+  );
+
+  // Kirim balik SELURUH pesan format apa adanya + isian, seperti yang
+  // benar-benar dilakukan warga.
+  await webhook(pesanWa(
+    "🗂️ *FORMULIR PERMINTAAN DATA*\n\n" +
+    "Salin pesan ini, lengkapi setelah tanda titik dua, lalu kirim kembali dalam *satu* pesan.\n\n" +
+    "Nama:Habib\nInstansi:BPS\nAlamat:Musi Rawas\nEmail:habibwafi96@gmail.com\n" +
+    "No HP:081384467988\nData diminta:Pdrb\nKeperluan:Kuliah\nFormat:2\nCatatan:bebas\n\n" +
+    "_Kolom format diisi angka - 1=Berkas digital, 2=Cetak, 3=Ambil langsung di kantor._\n" +
+    '_Kolom nomor HP boleh diisi "sama" untuk memakai nomor WhatsApp ini. Kolom catatan boleh diisi "-"._\n\n' +
+    "Ketik *batal* kapan saja untuk keluar."
+  ));
+  await jeda(700);
+
+  const idSalin = sql(`SELECT id FROM pesta.permintaan_data WHERE nama='Habib' AND keperluan='Kuliah' ORDER BY id DESC LIMIT 1;`);
+  lapor("formulir yang disalin utuh (petunjuk ikut terkirim) tetap tersimpan", idSalin !== "");
+  lapor(
+    "  nomor HP yang diisi warga TIDAK tertimpa kalimat petunjuk",
+    sql(`SELECT no_hp FROM pesta.permintaan_data WHERE id=${idSalin};`) === "081384467988"
+  );
+  lapor(
+    "  Format terbaca dari jawaban warga (2=Cetak), bukan dari baris petunjuk",
+    sql(`SELECT format_diinginkan FROM pesta.permintaan_data WHERE id=${idSalin};`) === "HARD_COPY"
+  );
+  sql(`DELETE FROM pesta.permintaan_data WHERE id=${idSalin};`);
+
   console.log("\nP. NOTIFIKASI PERMOHONAN BARU KE WA PETUGAS");
 
   if (!env.BEREGAM_STAFF_WA) {

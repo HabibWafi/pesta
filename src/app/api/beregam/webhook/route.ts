@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { beregamContacts } from "@/lib/beregam/db/schema";
 import { findOrCreateContactByWaId, pesanSudahAda, pesanTerakhir } from "@/lib/beregam/db/queries";
 import { webhookSah, HEADER_WEBHOOK_HMAC } from "@/lib/beregam/auth";
 import { webhookPayloadSchema } from "@/lib/beregam/contracts";
+import { namaProfil, nomorAsli } from "@/lib/beregam/identitas";
 import { getConfig } from "@/lib/beregam/config";
 import { getBeregamService } from "@/lib/beregam/services/beregam-service";
 import { beregamSessions } from "@/lib/beregam/db/schema";
@@ -103,8 +103,16 @@ async function proses(
 ): Promise<void> {
   const config = getConfig();
   const service = getBeregamService();
-  const nama = p.pushName ?? p.notifyName ?? null;
-  const contact = await findOrCreateContactByWaId(chatId, nama);
+
+  /*
+   * chatId bisa berupa LID ("...@lid"), bukan nomor telepon. Nomor aslinya
+   * diambil terpisah dari payload - lihat penjelasan lengkap di
+   * src/lib/beregam/identitas.ts. Nama profil juga tersembunyi di dalam
+   * `_data` pada payload LID, yang membuat kontak sempat tersimpan tanpa
+   * nama sama sekali.
+   */
+  const nama = namaProfil(p);
+  const contact = await findOrCreateContactByWaId(chatId, nama, nomorAsli(p));
 
   // Umur pesan menurut cap waktu WhatsApp. Dipakai pagar pesan basi.
   const umurMenit = p.timestamp
