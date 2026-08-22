@@ -24,7 +24,7 @@
 import { and, desc, eq, like } from "drizzle-orm";
 import { db } from "../../src/lib/db/index.js";
 import { beregamContacts, beregamMessages } from "../../src/lib/beregam/db/schema.js";
-import { nomorAsli } from "../../src/lib/beregam/identitas.js";
+import { namaProfil, nomorAsli } from "../../src/lib/beregam/identitas.js";
 
 const terapkan = process.argv.includes("terapkan");
 
@@ -60,32 +60,46 @@ async function main() {
 
     const payload = (pesan?.raw as { payload?: unknown } | null)?.payload;
     const nomor = nomorAsli(payload as never);
+    // Nama profil juga hilang pada kontak LID: pushName-nya hanya ada di
+    // dalam _data, dan kode lama tidak membacanya. Akibatnya inbox petugas
+    // cuma menampilkan deretan angka. Sumbernya sama, jadi dipulihkan
+    // sekalian di sini.
+    const nama = namaProfil(payload as never);
     const lidPolos = k.waId.split("@")[0];
 
     // Tampilkan tersamar - berkas log tidak boleh memuat nomor lengkap.
     const samar = (n: string) => (n.length > 7 ? `${n.slice(0, 5)}****${n.slice(-3)}` : n || "-");
 
-    if (!nomor) {
-      console.log(`  ? id=${k.id}  LID ${lidPolos}  -> nomor asli tidak ditemukan di riwayat`);
+    const nomorPerluDiubah = Boolean(nomor) && nomor !== k.phone;
+    const namaPerluDiubah = Boolean(nama) && !k.name;
+
+    if (!nomor && !nama) {
+      console.log(`  ? id=${k.id}  LID ${lidPolos}  -> tidak ada yang bisa dipulihkan dari riwayat`);
       takDiketahui += 1;
       continue;
     }
 
-    if (k.phone === nomor) {
+    if (!nomorPerluDiubah && !namaPerluDiubah) {
       sudahBenar += 1;
       continue;
     }
 
-    console.log(
-      `  ${terapkan ? "diperbaiki" : "akan diperbaiki"}: id=${k.id}  ` +
-        `${samar(k.phone)} -> ${samar(nomor)}` +
-        (k.phone === lidPolos ? "  (sebelumnya angka LID)" : "")
-    );
+    const bagian = [
+      nomorPerluDiubah
+        ? `${samar(k.phone)} -> ${samar(nomor)}${k.phone === lidPolos ? " (sebelumnya angka LID)" : ""}`
+        : "",
+      namaPerluDiubah ? `nama: (kosong) -> ${nama}` : "",
+    ].filter(Boolean);
+
+    console.log(`  ${terapkan ? "diperbaiki" : "akan diperbaiki"}: id=${k.id}  ${bagian.join("  |  ")}`);
 
     if (terapkan) {
       await db
         .update(beregamContacts)
-        .set({ phone: nomor })
+        .set({
+          ...(nomorPerluDiubah ? { phone: nomor } : {}),
+          ...(namaPerluDiubah && nama ? { name: nama } : {}),
+        })
         .where(eq(beregamContacts.id, k.id));
     }
     diperbaiki += 1;
