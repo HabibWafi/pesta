@@ -52,6 +52,8 @@ export interface KontenLanding {
   tampilPeta: boolean;
   tampilInklusi: boolean;
   googleMapsKey: string;
+  /** Tahun berjalan WIB, untuk label Survei Kebutuhan Data. */
+  tahunSkd: number;
 }
 
 /**
@@ -82,7 +84,7 @@ export default function HomeClient({ konten }: { konten: KontenLanding }) {
           onOpenPengaduan={() => setPengaduanOpen(true)}
         />
         {konten.tampilInklusi && <InclusivitySection />}
-        <SpecialServicesSection />
+        <SpecialServicesSection tahunSkd={konten.tahunSkd} />
         <VidconSection onOpenVidcon={() => setVidconOpen(true)} />
         {konten.tampilTestimoni && konten.testimoni.length > 0 && (
           <DocumentationSection testimoni={konten.testimoni} />

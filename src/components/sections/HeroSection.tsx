@@ -43,8 +43,12 @@ export default function HeroSection({ onOpenVidcon, onOpenPengaduan }: HeroSecti
       href: "#layanan-khusus",
       isInternal: false
     },
-    { 
-      name: "SKD 2025", 
+    {
+      // Tanpa tahun dengan sengaja. Kartu ini hanya pintasan ke bagian
+      // "Layanan Khusus" di bawah, dan tahunnya sudah tertulis di kartu SKD
+      // yang sebenarnya - dua tempat yang menyebut tahun berarti dua tempat
+      // yang bisa berbeda saat pergantian tahun.
+      name: "SKD",
       desc: "Survei Kebutuhan Data",
       icon: FileCheck2, 
       bgColor: "bg-cyan-50 text-cyan-600 border-cyan-200/60",

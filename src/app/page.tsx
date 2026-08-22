@@ -1,5 +1,6 @@
 import HomeClient from "@/components/HomeClient";
 import { ambilPengaturan, ambilTestimoni, ambilFaq, aktif } from "@/lib/content";
+import { komponenWib } from "@/lib/waktu";
 
 /**
  * Halaman utama PESTA.
@@ -31,6 +32,20 @@ export default async function Home() {
         tampilPeta: aktif(pengaturan["tampilan.peta"]),
         tampilInklusi: aktif(pengaturan["tampilan.inklusi"]),
         googleMapsKey: process.env.GOOGLE_MAPS_EMBED_KEY ?? "",
+        /**
+         * Tahun berjalan menurut WIB, untuk label Survei Kebutuhan Data.
+         *
+         * Dihitung DI SERVER lalu dioper ke bawah, bukan dipanggil langsung di
+         * komponen klien. Kalau dihitung di dua tempat, halaman yang dirender
+         * server tepat sebelum pergantian tahun akan berbeda dari yang
+         * dihidrasi peramban sesudahnya, dan React melaporkannya sebagai
+         * ketidakcocokan hidrasi. Satu nilai, satu sumber.
+         *
+         * Halaman ini divalidasi ulang tiap 5 menit, jadi labelnya ikut
+         * berganti sendiri paling lama 5 menit setelah tahun baru - tanpa
+         * perlu ada yang menyunting kode.
+         */
+        tahunSkd: komponenWib().tahun,
       }}
     />
   );
