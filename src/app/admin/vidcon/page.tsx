@@ -15,6 +15,8 @@ import {
   Building,
   MessageCircle,
   Globe,
+  Send,
+  Loader2,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -50,6 +52,60 @@ export default function AdminVidconPage() {
   // Custom Delete Modal State
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  /*
+   * Proses & kirim undangan ViDCon lewat WhatsApp.
+   *
+   * Selalu lewat PRATINJAU lebih dulu. Undangan ini keluar atas nama BPS
+   * dan berisi jadwal serta tautan rapat - petugas harus melihat persis apa
+   * yang akan diterima warga sebelum menekan kirim, bukan menekan tombol
+   * lalu berharap isinya benar.
+   */
+  const [proses, setProses] = useState<VidconRequest | null>(null);
+  const [pratinjau, setPratinjau] = useState<{ nomorWa: string; pesan: string; sudahDiproses: boolean } | null>(null);
+  const [galatPratinjau, setGalatPratinjau] = useState<string | null>(null);
+  const [memuatPratinjau, setMemuatPratinjau] = useState(false);
+  const [mengirim, setMengirim] = useState(false);
+
+  const bukaProses = async (item: VidconRequest) => {
+    setProses(item);
+    setPratinjau(null);
+    setGalatPratinjau(null);
+    setMemuatPratinjau(true);
+    try {
+      const res = await fetch(`/api/admin/vidcon/${item.id}/proses`);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setGalatPratinjau(data.message || "Gagal menyiapkan undangan");
+      } else {
+        setPratinjau({ nomorWa: data.nomorWa, pesan: data.pesan, sudahDiproses: data.sudahDiproses });
+      }
+    } catch {
+      setGalatPratinjau("Terjadi kendala jaringan saat menyiapkan undangan.");
+    } finally {
+      setMemuatPratinjau(false);
+    }
+  };
+
+  const kirimUndangan = async () => {
+    if (!proses) return;
+    setMengirim(true);
+    try {
+      const res = await fetch(`/api/admin/vidcon/${proses.id}/proses`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message);
+
+      toast.success("Undangan ViDCon Terkirim", { description: data.message });
+      setProses(null);
+      fetchVidcon();
+    } catch (err) {
+      toast.error("Gagal Mengirim Undangan", {
+        description: err instanceof Error ? err.message : "Terjadi kendala jaringan.",
+      });
+    } finally {
+      setMengirim(false);
+    }
+  };
 
   const fetchVidcon = async () => {
     setLoading(true);
@@ -381,6 +437,13 @@ export default function AdminVidconPage() {
                     {/* Actions */}
                     <td className="p-3.5 text-right whitespace-nowrap space-x-1">
                       <button
+                        onClick={() => bukaProses(item)}
+                        className="p-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/40 hover:bg-emerald-600 dark:hover:bg-emerald-600 text-emerald-600 dark:text-emerald-300 hover:text-white transition-colors"
+                        title="Proses: kirim undangan ViDCon lewat WhatsApp"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => openEditModal(item)}
                         className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-600 dark:hover:bg-indigo-600 text-indigo-600 dark:text-indigo-300 hover:text-white transition-colors"
                         title="Ubah Status / Balas"
@@ -455,6 +518,81 @@ export default function AdminVidconPage() {
           </div>
         )}
       </div>
+
+      {/* Proses & kirim undangan ViDCon */}
+      {proses && (
+        <div className="fixed inset-0 z-50 overflow-y-auto p-4 bg-slate-950/70 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 border border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
+                  <Send className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  Kirim Undangan ViDCon
+                </h3>
+                <button onClick={() => setProses(null)} className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {memuatPratinjau && (
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 py-6 justify-center">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Menyiapkan undangan...
+                </div>
+              )}
+
+              {galatPratinjau && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300">
+                  {galatPratinjau}
+                </div>
+              )}
+
+              {pratinjau && (
+                <>
+                  {pratinjau.sudahDiproses && (
+                    <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
+                      Permohonan ini <strong>sudah pernah diproses</strong>. Mengirim lagi akan
+                      membuat warga menerima undangan kedua.
+                    </div>
+                  )}
+
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    Dikirim ke WhatsApp{" "}
+                    <strong className="text-slate-900 dark:text-white">+{pratinjau.nomorWa}</strong>{" "}
+                    lewat bot Beregam. Beginilah pesan yang akan diterima warga:
+                  </p>
+
+                  {/* Pratinjau ditulis dengan latar gelap seperti gelembung chat supaya
+                      petugas membacanya sebagaimana warga akan membacanya. */}
+                  <div className="p-3.5 rounded-2xl bg-slate-900 text-slate-100 text-[11px] leading-relaxed whitespace-pre-wrap font-mono max-h-72 overflow-y-auto border border-slate-700">
+                    {pratinjau.pesan}
+                  </div>
+
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                    Naskah dan tautan Zoom bisa diubah di Kelola Konten &rsaquo; ViDCon.
+                  </p>
+                </>
+              )}
+
+              <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  onClick={() => setProses(null)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={kirimUndangan}
+                  disabled={!pratinjau || mengirim}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 disabled:opacity-50 inline-flex items-center gap-2"
+                >
+                  {mengirim ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  {mengirim ? "Mengirim..." : "Kirim & Setujui"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Status Modal - overflow-y-auto di sini, BUKAN items-center, supaya dialog panjang di HP kecil tetap bisa digulung sampai ke tombol paling atas/bawah. */}
       {selectedItem && (

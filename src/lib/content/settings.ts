@@ -11,7 +11,7 @@ import { siteSettings } from "@/lib/db/schema";
  * sehingga situs tidak pernah tampil kosong walau tabelnya belum diisi.
  */
 
-export type GrupSetting = "kontak" | "peta" | "tampilan" | "istilah";
+export type GrupSetting = "kontak" | "peta" | "tampilan" | "istilah" | "vidcon";
 
 type Definisi = {
   grup: GrupSetting;
@@ -156,6 +156,44 @@ export const DEFINISI_SETTING = {
       "Masih dikembangkan. Selama mati, halaman /dashboard tidak bisa dibuka warga - " +
       "petugas yang login tetap bisa memeriksanya lebih dulu.",
     bawaan: "0",
+  },
+
+  /*
+   * --- Undangan ViDCon lewat WhatsApp ---
+   *
+   * Tautan rapat dan naskah undangannya disimpan di sini, bukan ditulis
+   * tetap di kode. Tautan Zoom berganti saat akun atau jadwal rapat diatur
+   * ulang, dan itu urusan petugas PST - bukan alasan untuk menunggu deploy.
+   */
+  "vidcon.zoom": {
+    grup: "vidcon",
+    label: "Tautan rapat ViDCon (Zoom)",
+    bantuan:
+      "Dipakai di setiap undangan yang dikirim ke warga. Ganti di sini bila " +
+      "tautan rapatnya berubah - tidak perlu mengubah kode.",
+    bawaan: "https://us06web.zoom.us/j/81168446026?pwd=265YNaiIJ9rFQaTcdBJozGOkgSj4mS.1",
+  },
+  "vidcon.undangan": {
+    grup: "vidcon",
+    label: "Naskah undangan ViDCon",
+    jenis: "teks-panjang",
+    bantuan:
+      "Variabel yang tersedia: {nama} {instansi} {tanggal} {jam} {topik} {zoom} {tiket}. " +
+      "Semuanya diisi otomatis dari permohonan warga.",
+    bawaan:
+      "🎥 *Undangan Konsultasi Statistik (ViDCon)*\n" +
+      "BPS Kabupaten Musi Rawas\n\n" +
+      "Halo *{nama}*, permohonan ViDCon Anda sudah kami *setujui*. 🎉\n\n" +
+      "📌 *Rincian jadwal*\n" +
+      "• Hari/tanggal: {tanggal}\n" +
+      "• Pukul: {jam} WIB\n" +
+      "• Topik: {topik}\n" +
+      "• Nomor tiket: #{tiket}\n\n" +
+      "🔗 *Tautan Zoom*\n{zoom}\n\n" +
+      "Mohon bergabung 5 menit sebelum waktunya ya. Siapkan juga pertanyaan " +
+      "atau data yang ingin dibahas supaya konsultasinya lebih terarah.\n\n" +
+      "Berhalangan hadir atau ingin mengubah jadwal? Balas pesan ini saja, " +
+      "nanti petugas kami bantu. 🙏",
   },
 
   // --- Label istilah ---
