@@ -41,9 +41,9 @@ export default function VidconModal({ isOpen, onClose }: VidconModalProps) {
       });
       reset();
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       toast.error("Gagal Mendaftar ViDCon", {
-        description: err.message || "Terjadi kendala jaringan.",
+        description: err instanceof Error ? err.message : "Terjadi kendala jaringan.",
       });
     }
   };
@@ -273,19 +273,25 @@ export default function VidconModal({ isOpen, onClose }: VidconModalProps) {
                 <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-indigo-600" /> Jam Konsultasi *
                 </label>
-                <select
+                {/*
+                  Jam bebas sampai satuan menit, bukan lima pilihan tetap.
+                  Warga yang hanya bisa pukul 10.00 dulu terpaksa memilih jam
+                  yang tidak cocok lalu menegosiasikannya lewat telepon -
+                  dan jadwal di sistem jadi berbeda dari yang disepakati.
+                */}
+                <input
                   {...register("jam")}
+                  type="time"
+                  step={300}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"
-                >
-                  <option value="">-- Pilih Jam (Senin - Jumat) --</option>
-                  <option value="08:30">08:30 WIB</option>
-                  <option value="09:30">09:30 WIB</option>
-                  <option value="10:30">10:30 WIB</option>
-                  <option value="13:30">13:30 WIB</option>
-                  <option value="14:30">14:30 WIB</option>
-                </select>
-                {errors.jam && (
+                />
+                {errors.jam ? (
                   <p className="text-xs text-rose-500 mt-1">{errors.jam.message}</p>
+                ) : (
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Jam layanan Senin&ndash;Jumat, 08.00&ndash;15.00 WIB. Di luar itu boleh
+                    diajukan, nanti petugas menawarkan jadwal terdekat.
+                  </p>
                 )}
               </div>
             </div>

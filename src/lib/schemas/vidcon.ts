@@ -21,8 +21,25 @@ export const vidconSchema = z.object({
   email: z.string().trim().email("Format email tidak valid"),
   topik: z.string().trim().min(2, "Pilih cakupan/topik konsultasi"),
   deskripsi: z.string().trim().min(10, "Uraian deskripsi minimal 10 karakter"),
-  tanggal: z.string().trim().min(8, "Pilih tanggal konsultasi"),
-  jam: z.string().trim().min(4, "Pilih jam konsultasi"),
+  tanggal: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Pilih tanggal konsultasi"),
+
+  /**
+   * Jam bebas sampai satuan menit, bukan lagi lima pilihan tetap.
+   *
+   * Sebelumnya hanya tersedia 08:30, 09:30, 10:30, 13:30, dan 14:30. Warga
+   * yang hanya bisa pukul 10.00 terpaksa memilih jam yang sebenarnya tidak
+   * cocok, lalu menegosiasikannya ulang lewat telepon - dan jadwal di
+   * sistem berbeda dari yang sebenarnya disepakati.
+   *
+   * Divalidasi bentuknya saja (HH:MM 24 jam), bukan dibatasi jam layanan:
+   * petugas tetap bisa menyesuaikan jadwalnya saat memproses permohonan,
+   * jadi menolak permintaan di sini hanya menambah hambatan tanpa menambah
+   * kepastian.
+   */
+  jam: z
+    .string()
+    .trim()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Pilih jam konsultasi (format 24 jam, mis. 09:30)"),
 
   /** Kebutuhan pendampingan inklusif. Lihat ./inklusi.ts */
   layananInklusif: layananInklusifSchema,

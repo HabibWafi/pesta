@@ -190,6 +190,92 @@ lapor(
   sql(`SELECT status FROM pesta.vidcon_requests WHERE id=${idB};`) === "PENDING"
 );
 
+// === D. Mengatur ulang jadwal saat memproses ===============================
+//
+// Jam yang diminta warga bisa bentrok atau di luar jam layanan, jadi petugas
+// boleh menawarkan jadwal lain. Yang TIDAK boleh: undangan menyebut jadwal A
+// sementara panel menyimpan jadwal B - petugas lain akan menyiapkan rapat di
+// jam yang salah, sementara warga datang sesuai yang tertulis di WhatsApp-nya.
+console.log("\nD. MENGATUR ULANG JADWAL SAAT MEMPROSES");
+
+sql(`DELETE FROM pesta.vidcon_requests WHERE nama='${NAMA_UJI}';`);
+sql(`DELETE FROM pesta.beregam_contacts WHERE phone='6281373028055';`);
+const idC = buatPermohonan("081373028055");
+
+// Pratinjau dengan jadwal usulan tidak boleh mengubah apa pun.
+const praBaru = await fetch(
+  `${B}/api/admin/vidcon/${idC}/proses?tanggal=2026-09-02&jam=10:15`,
+  { headers: kuki }
+);
+const dataPraBaru = await praBaru.json();
+lapor("pratinjau memakai jadwal usulan", dataPraBaru.success === true && dataPraBaru.jadwalBerubah === true);
+lapor("  teksnya menyebut jadwal BARU", String(dataPraBaru.pesan).includes("2 September 2026") && String(dataPraBaru.pesan).includes("10:15"));
+lapor("  teksnya tidak lagi menyebut jadwal lama", !String(dataPraBaru.pesan).includes("26 Agustus 2026"));
+lapor(
+  "  pratinjau TIDAK mengubah jadwal tersimpan",
+  sql(`SELECT CONCAT(tanggal,' ',jam) FROM pesta.vidcon_requests WHERE id=${idC};`) === "2026-08-26 13:30"
+);
+
+// Kirim dengan jadwal baru.
+const kirimBaru = await fetch(`${B}/api/admin/vidcon/${idC}/proses`, {
+  method: "POST",
+  headers: { ...kuki, "Content-Type": "application/json" },
+  body: JSON.stringify({ tanggal: "2026-09-02", jam: "10:15" }),
+});
+const dataKirimBaru = await kirimBaru.json();
+lapor("kirim dengan jadwal baru berhasil", kirimBaru.status === 200 && dataKirimBaru.success === true);
+lapor(
+  "  jadwal di permohonan IKUT diperbarui, bukan hanya di undangan",
+  sql(`SELECT CONCAT(tanggal,' ',jam) FROM pesta.vidcon_requests WHERE id=${idC};`) === "2026-09-02 10:15"
+);
+const antreanBaru = sql(
+  `SELECT o.payload FROM pesta.beregam_outbox o JOIN pesta.beregam_contacts c ON c.id=o.contact_id ` +
+    `WHERE c.phone='6281373028055' ORDER BY o.id DESC LIMIT 1;`
+);
+lapor("  undangan yang dikirim memakai jadwal baru", antreanBaru.includes("2 September 2026") && antreanBaru.includes("10:15"));
+lapor(
+  "  perubahan jadwal tercatat di catatan petugas",
+  sql(`SELECT IFNULL(catatan_admin,'') FROM pesta.vidcon_requests WHERE id=${idC};`).includes("Jadwal diubah")
+);
+
+// Jadwal ngawur ditolak, tanpa menyentuh apa pun.
+sql(`DELETE FROM pesta.vidcon_requests WHERE nama='${NAMA_UJI}';`);
+const idD = buatPermohonan("081373028055");
+const outboxSblm = Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox;`));
+for (const [ket, body] of [
+  ["tanggal tidak ada di kalender", { tanggal: "2026-02-31", jam: "10:00" }],
+  ["jam di luar 24 jam", { tanggal: "2026-09-02", jam: "25:00" }],
+  ["jam bukan format jam", { tanggal: "2026-09-02", jam: "pagi" }],
+] as const) {
+  const r = await fetch(`${B}/api/admin/vidcon/${idD}/proses`, {
+    method: "POST",
+    headers: { ...kuki, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  lapor(`  ${ket} ditolak 422`, r.status === 422);
+}
+lapor(
+  "  tidak ada undangan yang terlanjur terkirim",
+  Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox;`)) === outboxSblm
+);
+lapor(
+  "  status & jadwal tetap seperti semula",
+  sql(`SELECT CONCAT(status,' ',tanggal,' ',jam) FROM pesta.vidcon_requests WHERE id=${idD};`) ===
+    "PENDING 2026-08-26 13:30"
+);
+
+// Tanpa jadwal usulan = pakai jadwal warga apa adanya.
+const tanpaUsul = await fetch(`${B}/api/admin/vidcon/${idD}/proses`, {
+  method: "POST",
+  headers: { ...kuki, "Content-Type": "application/json" },
+  body: JSON.stringify({}),
+});
+lapor("tanpa jadwal usulan tetap berhasil", (await tanpaUsul.json()).success === true);
+lapor(
+  "  jadwal warga dipakai apa adanya",
+  sql(`SELECT CONCAT(tanggal,' ',jam) FROM pesta.vidcon_requests WHERE id=${idD};`) === "2026-08-26 13:30"
+);
+
 bersihkan();
 console.log(gagal === 0 ? "\nSEMUA UJI LULUS.\n" : `\n${gagal} UJI GAGAL.\n`);
 process.exit(gagal === 0 ? 0 : 1);

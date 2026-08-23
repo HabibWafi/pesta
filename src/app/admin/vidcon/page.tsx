@@ -67,31 +67,58 @@ export default function AdminVidconPage() {
   const [memuatPratinjau, setMemuatPratinjau] = useState(false);
   const [mengirim, setMengirim] = useState(false);
 
-  const bukaProses = async (item: VidconRequest) => {
-    setProses(item);
-    setPratinjau(null);
-    setGalatPratinjau(null);
+  // Jadwal yang akan dipakai undangan. Petugas boleh menawarkan jadwal lain
+  // daripada yang diminta warga - jam yang diminta bisa bentrok atau di luar
+  // jam layanan.
+  const [jadwalTanggal, setJadwalTanggal] = useState("");
+  const [jadwalJam, setJadwalJam] = useState("");
+
+  const muatPratinjau = async (item: VidconRequest, tanggal: string, jam: string) => {
     setMemuatPratinjau(true);
+    setGalatPratinjau(null);
     try {
-      const res = await fetch(`/api/admin/vidcon/${item.id}/proses`);
+      const q = new URLSearchParams({ tanggal, jam });
+      const res = await fetch(`/api/admin/vidcon/${item.id}/proses?${q}`);
       const data = await res.json();
       if (!res.ok || !data.success) {
+        setPratinjau(null);
         setGalatPratinjau(data.message || "Gagal menyiapkan undangan");
       } else {
         setPratinjau({ nomorWa: data.nomorWa, pesan: data.pesan, sudahDiproses: data.sudahDiproses });
       }
     } catch {
+      setPratinjau(null);
       setGalatPratinjau("Terjadi kendala jaringan saat menyiapkan undangan.");
     } finally {
       setMemuatPratinjau(false);
     }
   };
 
+  const bukaProses = (item: VidconRequest) => {
+    setProses(item);
+    setPratinjau(null);
+    setGalatPratinjau(null);
+    setJadwalTanggal(item.tanggal);
+    setJadwalJam(item.jam);
+    void muatPratinjau(item, item.tanggal, item.jam);
+  };
+
+  /** Jadwal diubah petugas: pratinjau ikut disegarkan supaya isinya tidak tertinggal. */
+  const ubahJadwal = (tanggal: string, jam: string) => {
+    setJadwalTanggal(tanggal);
+    setJadwalJam(jam);
+    if (proses && tanggal && jam) void muatPratinjau(proses, tanggal, jam);
+  };
+
   const kirimUndangan = async () => {
     if (!proses) return;
     setMengirim(true);
     try {
-      const res = await fetch(`/api/admin/vidcon/${proses.id}/proses`, { method: "POST" });
+      const res = await fetch(`/api/admin/vidcon/${proses.id}/proses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tanggal: jadwalTanggal, jam: jadwalJam }),
+      });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message);
 
@@ -106,6 +133,9 @@ export default function AdminVidconPage() {
       setMengirim(false);
     }
   };
+
+  const jadwalBerubah =
+    Boolean(proses) && (jadwalTanggal !== proses?.tanggal || jadwalJam !== proses?.jam);
 
   const fetchVidcon = async () => {
     setLoading(true);
@@ -545,6 +575,43 @@ export default function AdminVidconPage() {
                   {galatPratinjau}
                 </div>
               )}
+
+              {/*
+                Jadwal bisa diatur ulang di sini. Yang diubah bukan cuma isi
+                undangan - baris permohonannya ikut diperbarui saat dikirim,
+                supaya panel dan WhatsApp warga tidak pernah menyebut jam
+                yang berbeda.
+              */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                  Jadwal konsultasi
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="date"
+                    value={jadwalTanggal}
+                    onChange={(e) => ubahJadwal(e.target.value, jadwalJam)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <input
+                    type="time"
+                    step={300}
+                    value={jadwalJam}
+                    onChange={(e) => ubahJadwal(jadwalTanggal, e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                {jadwalBerubah ? (
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
+                    Jadwal diubah dari permintaan warga ({proses.tanggal} pukul {proses.jam}).
+                    Undangan dan data permohonan akan memakai jadwal baru ini.
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                    Sesuai permintaan warga. Ubah bila jamnya bentrok atau di luar jam layanan.
+                  </p>
+                )}
+              </div>
 
               {pratinjau && (
                 <>
