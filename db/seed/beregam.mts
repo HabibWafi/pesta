@@ -27,7 +27,7 @@ const MENU = [
       "📍 *Alamat*\n" +
       "Jl. Pangeran Mohammad Amin, Komplek Perkantoran Agropolitan\n" +
       "Muara Beliti, Musi Rawas, Sumatera Selatan\n\n" +
-      "☎️ Telepon: (0733) 4540056\n" +
+      "☎️ Telepon: (0733) 7432008\n" +
       "📧 Email: bps1605@bps.go.id\n\n" +
       "Ditunggu kedatangannya! 😊",
   },

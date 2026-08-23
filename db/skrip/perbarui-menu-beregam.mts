@@ -125,7 +125,7 @@ async function main() {
         "*Alamat*\n" +
         "Jl. Pangeran Mohammad Amin, Komplek Perkantoran Agropolitan\n" +
         "Muara Beliti, Musi Rawas, Sumatera Selatan\n\n" +
-        "Telepon: (0733) 4540056\n" +
+        "Telepon: (0733) 7432008\n" +
         "Email: bps1605@bps.go.id",
       "⏰ *Jam Layanan Pelayanan Statistik Terpadu (PST)*\n" +
         "Senin - Kamis: 08.00 - 15.30 WIB\n" +
@@ -134,7 +134,7 @@ async function main() {
         "📍 *Alamat*\n" +
         "Jl. Pangeran Mohammad Amin, Komplek Perkantoran Agropolitan\n" +
         "Muara Beliti, Musi Rawas, Sumatera Selatan\n\n" +
-        "☎️ Telepon: (0733) 4540056\n" +
+        "☎️ Telepon: (0733) 7432008\n" +
         "📧 Email: bps1605@bps.go.id\n\n" +
         "Ditunggu kedatangannya! 😊"
     )

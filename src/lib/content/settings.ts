@@ -41,7 +41,7 @@ export const DEFINISI_SETTING = {
   "kontak.telepon": {
     grup: "kontak",
     label: "Telepon kantor",
-    bawaan: "(0733) 4540056",
+    bawaan: "(0733) 7432008",
   },
   "kontak.whatsapp": {
     grup: "kontak",
