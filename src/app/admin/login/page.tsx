@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Lock, Mail, ArrowRight, ShieldCheck } from "lucide-react";
@@ -11,27 +11,21 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // Check if user is already logged in
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const res = await fetch("/api/auth/me");
-        const data = await res.json();
-        if (res.ok && data.success && data.user) {
-          // Already logged in -> Skip login page and redirect to dashboard
-          router.replace("/admin/dashboard");
-          return;
-        }
-      } catch (err) {
-        // Not logged in -> stay on login page
-      } finally {
-        setCheckingAuth(false);
-      }
-    };
-    checkSession();
-  }, [router]);
+  /*
+   * TIDAK ADA lagi pemeriksaan sesi di sisi klien di sini.
+   *
+   * Dulu halaman ini membuka dengan layar "Memeriksa Sesi Login...", memanggil
+   * /api/auth/me, baru menampilkan formulir. Konsekuensinya fatal: bila
+   * JavaScript-nya gagal dimuat - misalnya peramban memegang HTML lama yang
+   * menyebut berkas yang sudah dihapus deploy berikutnya - tidak ada apa pun
+   * yang mengubah layar itu, dan petugas menatap teks menggantung tanpa gaya
+   * selamanya. Formulirnya sendiri sebenarnya sudah ada di HTML; hanya
+   * disembunyikan oleh keadaan yang tak pernah berubah.
+   *
+   * Sekarang formulir langsung tampil, dan yang sudah punya sesi dialihkan
+   * lebih awal oleh src/proxy.ts - di sana sesinya memang sudah diverifikasi.
+   */
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,26 +50,33 @@ export default function AdminLoginPage() {
       toast.success("Login Admin Berhasil!", {
         description: `Selamat datang kembali, ${data.user.name}`,
       });
-      router.push("/admin/dashboard");
-    } catch (err: any) {
+
+      /*
+       * Kembali ke halaman yang tadi dituju sebelum diminta login.
+       *
+       * Dibaca dari window, BUKAN useSearchParams(). useSearchParams memaksa
+       * Next melepas render di server untuk seluruh halaman ini
+       * (BAILOUT_TO_CLIENT_SIDE_RENDERING), sehingga formulirnya hilang dari
+       * HTML dan hanya muncul setelah JavaScript berjalan - persis kerapuhan
+       * yang sedang diperbaiki di berkas ini. Di dalam penangan submit kita
+       * sudah pasti berada di peramban, jadi window aman dibaca.
+       *
+       * Nilainya dipastikan mengarah ke dalam /admin: tanpa itu, tautan
+       * berisi ?lanjut=//situs-lain bisa dipakai memantulkan petugas ke luar
+       * tepat setelah ia login.
+       */
+      const lanjut = new URLSearchParams(window.location.search).get("lanjut");
+      const tujuan = lanjut && /^\/admin(\/|$)/.test(lanjut) ? lanjut : "/admin/dashboard";
+      router.push(tujuan);
+    } catch (err) {
       toast.error("Gagal Autentikasi Admin", {
-        description: err.message || "Periksa kembali email & password Anda.",
+        description:
+          err instanceof Error ? err.message : "Periksa kembali email & password Anda.",
       });
     } finally {
       setLoading(false);
     }
   };
-
-  if (checkingAuth) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white text-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <span>Memeriksa Sesi Login...</span>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden selection:bg-indigo-500 selection:text-white">
