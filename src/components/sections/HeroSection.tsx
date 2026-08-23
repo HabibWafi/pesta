@@ -19,6 +19,32 @@ import {
   ArrowRight
 } from "lucide-react";
 
+/*
+ * Kelas grid per jumlah isi, ditulis UTUH.
+ *
+ * Tailwind memindai kode sebagai teks biasa, jadi kelas yang dirangkai saat
+ * program berjalan (`sm:grid-cols-${n}`) tidak pernah ikut ter-build dan
+ * grid-nya diam-diam kehilangan kolom. Karena itu tiap kemungkinan ditulis
+ * lengkap di sini.
+ *
+ * `max-w-*` + `mx-auto` yang membuat sisa kartu tetap DI TENGAH saat ada
+ * fitur yang disembunyikan - tanpa itu, kartunya menepi ke kiri dan
+ * meninggalkan ruang kosong yang terlihat seperti sesuatu yang gagal dimuat.
+ */
+const KOLOM_TOMBOL: Record<number, string> = {
+  1: "sm:grid-cols-1 sm:max-w-xs",
+  2: "sm:grid-cols-2 sm:max-w-lg",
+  3: "sm:grid-cols-3 sm:max-w-2xl",
+};
+
+const KOLOM_PORTAL: Record<number, string> = {
+  1: "sm:grid-cols-1 lg:grid-cols-1 lg:max-w-[13rem]",
+  2: "sm:grid-cols-2 lg:grid-cols-2 lg:max-w-md",
+  3: "sm:grid-cols-3 lg:grid-cols-3 lg:max-w-2xl",
+  4: "sm:grid-cols-2 lg:grid-cols-4 lg:max-w-4xl",
+  5: "sm:grid-cols-3 lg:grid-cols-5",
+};
+
 interface HeroSectionProps {
   onOpenVidcon: () => void;
   onOpenPengaduan: () => void;
@@ -86,6 +112,9 @@ export default function HeroSection({
   // ServicesSection.tsx soal kenapa itu berbeda.
   const serviceItems = semuaPortal.filter((p) => p.kunci !== "dashboard" || tampilDashboard);
 
+  // Dua tombol tetap (ViDCon, Aduan) + Sinta bila dinyalakan.
+  const jumlahTombol = 2 + (tampilSinta ? 1 : 0);
+
   return (
     <section id="hero" className="relative pt-32 pb-20 md:pt-40 md:pb-24 overflow-hidden bg-slate-50">
       {/* Dynamic Animated Background Glow Blobs */}
@@ -136,11 +165,11 @@ export default function HeroSection({
             Satu portal untuk layanan **Virtual Data Consultation (ViDCon)**, permohonan data statistik resmi, serta sarana pengaduan publik yang bebas biaya (Nol Rupiah).
           </Muncul>
 
-          {/* 3 Harmonious Action Buttons */}
+          {/* Tombol aksi - jumlahnya ikut saklar fitur, tata letaknya menyesuaikan */}
           <Muncul
             pemicu="segera"
             delay={0.3}
-            className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-4 max-w-2xl mx-auto"
+            className={`grid grid-cols-1 gap-3.5 pt-4 mx-auto ${KOLOM_TOMBOL[jumlahTombol] ?? "sm:grid-cols-3 sm:max-w-2xl"}`}
           >
             {/* Button 1: ViDCon Online */}
             <button
@@ -232,13 +261,20 @@ export default function HeroSection({
                 </p>
               </div>
             </div>
+            {/*
+              Jumlahnya DIHITUNG, bukan ditulis tetap.
+              Sebelumnya tertulis "5 Portal Terintegrasi" sementara yang
+              tampil tinggal 4 karena Dashboard disembunyikan. Ini situs
+              badan statistik - angka yang tidak cocok dengan yang terlihat
+              di layar adalah hal terakhir yang boleh ada di sini.
+            */}
             <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-              5 Portal Terintegrasi
+              {serviceItems.length} Portal Terintegrasi
             </span>
           </div>
 
-          {/* 5 Distinct Cards Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          {/* Kartu portal - jumlah kolom mengikuti yang benar-benar tampil */}
+          <div className={`grid grid-cols-2 gap-3.5 mx-auto ${KOLOM_PORTAL[serviceItems.length] ?? "sm:grid-cols-3 lg:grid-cols-5"}`}>
             {serviceItems.map((item, idx) => {
               const Icon = item.icon;
               const CardContent = (
