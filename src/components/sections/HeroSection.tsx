@@ -2,22 +2,27 @@
 
 import Link from "next/link";
 import Muncul from "@/components/ui/Muncul";
-import { 
-  Video, 
-  ShieldAlert, 
-  Sparkles, 
-  CheckCircle2, 
-  Bot, 
-  Zap, 
+import {
+  Video,
+  ShieldAlert,
+  Sparkles,
+  CheckCircle2,
+  Bot,
+  Zap,
   Lock,
   Database,
   Award,
   FileCheck2,
   LayoutDashboard,
   Home as HomeIcon,
+  MessageCircle,
   Layers,
   ArrowRight
 } from "lucide-react";
+
+/** Tautan chat WhatsApp resmi bot Beregam BPS Musi Rawas. */
+const TAUTAN_BEREGAM =
+  "https://api.whatsapp.com/message/NOQBDW2IPPY4D1?autoload=1&app_absent=0";
 
 /*
  * Kelas grid per jumlah isi, ditulis UTUH.
@@ -43,6 +48,7 @@ const KOLOM_PORTAL: Record<number, string> = {
   3: "sm:grid-cols-3 lg:grid-cols-3 lg:max-w-2xl",
   4: "sm:grid-cols-2 lg:grid-cols-4 lg:max-w-4xl",
   5: "sm:grid-cols-3 lg:grid-cols-5",
+  6: "sm:grid-cols-3 lg:grid-cols-3",
 };
 
 interface HeroSectionProps {
@@ -59,7 +65,7 @@ export default function HeroSection({
   tampilSinta,
   tampilDashboard,
 }: HeroSectionProps) {
-  // 5 distinct services in the grid showcase (removed the 3 hero CTAs: ViDCon, Pengaduan, Sinta AI)
+  // Portal pada grid showcase - jumlah yang tampil dihitung dari serviceItems.length, bukan angka tetap.
   const semuaPortal = [
     { 
       name: "SILASTIK BPS", 
@@ -104,6 +110,14 @@ export default function HeroSection({
       icon: HomeIcon,
       bgColor: "bg-amber-50 text-amber-600 border-amber-200/60",
       href: "#layanan-khusus",
+      isInternal: false
+    },
+    {
+      name: "Beregam",
+      desc: "Bot WhatsApp Layanan",
+      icon: MessageCircle,
+      bgColor: "bg-teal-50 text-teal-600 border-teal-200/60",
+      href: TAUTAN_BEREGAM,
       isInternal: false
     },
   ];
@@ -293,12 +307,21 @@ export default function HeroSection({
                 </div>
               );
 
+              // Tautan luar (mis. WhatsApp Beregam) dibuka di tab baru; anchor
+              // dalam halaman seperti "#layanan-khusus" tetap navigasi biasa.
+              const eksternal = item.href.startsWith("http");
+
               return item.isInternal ? (
                 <Link key={idx} href={item.href} className="block">
                   {CardContent}
                 </Link>
               ) : (
-                <a key={idx} href={item.href} className="block">
+                <a
+                  key={idx}
+                  href={item.href}
+                  className="block"
+                  {...(eksternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                >
                   {CardContent}
                 </a>
               );

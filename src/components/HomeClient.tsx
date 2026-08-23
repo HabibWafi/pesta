@@ -94,9 +94,10 @@ export default function HomeClient({ konten }: { konten: KontenLanding }) {
           onOpenPermintaanData={() => setPermintaanDataOpen(true)}
           tampilSinta={konten.tampilSinta}
           tampilDashboard={konten.tampilDashboard}
+          tahunSkd={konten.tahunSkd}
         />
         {konten.tampilInklusi && <InclusivitySection />}
-        <SpecialServicesSection tahunSkd={konten.tahunSkd} />
+        <SpecialServicesSection />
         <VidconSection onOpenVidcon={() => setVidconOpen(true)} />
         {konten.tampilTestimoni && konten.testimoni.length > 0 && (
           <DocumentationSection testimoni={konten.testimoni} />

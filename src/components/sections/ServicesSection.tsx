@@ -1,15 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { 
-  Bot, 
-  FileSpreadsheet, 
-  MessageSquareHeart, 
-  ArrowRight, 
-  CheckCircle2, 
+import {
+  Bot,
+  FileSpreadsheet,
+  MessageSquareHeart,
+  ArrowRight,
+  CheckCircle2,
   ExternalLink,
   Sparkles,
-  LayoutDashboard
+  LayoutDashboard,
+  Award,
+  FileCheck2,
+  Map
 } from "lucide-react";
 
 /** Kelas kolom per jumlah kartu. Nama kelasnya ditulis utuh supaya ikut ter-build Tailwind. */
@@ -18,6 +21,9 @@ const KOLOM_GRID: Record<number, string> = {
   2: "lg:grid-cols-2 lg:max-w-3xl lg:mx-auto",
   3: "lg:grid-cols-3",
   4: "lg:grid-cols-4",
+  5: "lg:grid-cols-3",
+  6: "lg:grid-cols-3",
+  7: "lg:grid-cols-4",
 };
 
 interface ServicesSectionProps {
@@ -27,6 +33,8 @@ interface ServicesSectionProps {
   /** Fitur yang masih dikembangkan, disaklar dari /admin/konten. */
   tampilSinta: boolean;
   tampilDashboard: boolean;
+  /** Tahun berjalan WIB, untuk label Survei Kebutuhan Data. */
+  tahunSkd: number;
 }
 
 export default function ServicesSection({
@@ -35,6 +43,7 @@ export default function ServicesSection({
   onOpenPermintaanData,
   tampilSinta,
   tampilDashboard,
+  tahunSkd,
 }: ServicesSectionProps) {
   const semuaKartu = [
     {
@@ -85,6 +94,48 @@ export default function ServicesSection({
       // permintaan resmi yang masuk ke petugas PST, bukan tautan keluar.
       secondaryButtonText: "Ajukan Permintaan Data",
       secondaryButtonAction: onOpenPermintaanData,
+    },
+    {
+      badge: "PP No. 51 Tahun 1999",
+      badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-100",
+      icon: Award,
+      iconColor: "bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white",
+      title: "ROMANTIK (Rekomendasi Statistik)",
+      desc: "Masukan dan rekomendasi BPS terhadap rancangan kegiatan survei statistik sektoral oleh Kementerian, Lembaga, dan OPD Musi Rawas.",
+      features: ["Pemberitahuan rencana survei sektoral", "Penjaminan kualitas metodologi statistik"],
+      buttonText: "Akses Portal ROMANTIK",
+      buttonHref: "https://romantik.web.bps.go.id",
+      buttonType: "external",
+      buttonStyle: "bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20",
+      hasSparkle: false,
+    },
+    {
+      badge: "Evaluasi Kepuasan & Anti Korupsi",
+      badgeColor: "bg-cyan-50 text-cyan-800 border-cyan-100",
+      icon: FileCheck2,
+      iconColor: "bg-gradient-to-tr from-cyan-600 to-cyan-400 text-white",
+      title: `Survei Kebutuhan Data (SKD ${tahunSkd})`,
+      desc: "Survei tahunan pengukuran kepuasan layanan PST, kualitas data BPS, dan Indeks Persepsi Anti Korupsi (IPAK) Musi Rawas.",
+      features: ["Evaluasi kualitas pelayanan publik", "Masukan indikator data terbaru"],
+      buttonText: `Isi Kuesioner SKD ${tahunSkd}`,
+      buttonHref: "https://skd.bps.go.id/skd/s/1605",
+      buttonType: "external",
+      buttonStyle: "bg-cyan-600 hover:bg-cyan-700 text-white shadow-md shadow-cyan-500/20",
+      hasSparkle: false,
+    },
+    {
+      badge: "SILASTIK BPS RI",
+      badgeColor: "bg-amber-50 text-amber-800 border-amber-100",
+      icon: Map,
+      iconColor: "bg-gradient-to-tr from-amber-600 to-amber-400 text-white",
+      title: "Data Mikro & Peta Digital Wilkerstat",
+      desc: "Permohonan data mikro terarsip, publikasi cetakan resmi, dan peta digital Wilayah Kerja Statistik (Wilkerstat) BPS.",
+      features: ["Akses data mikro anonim riset akademik", "Batas wilayah kerja & peta spasial digital"],
+      buttonText: "Akses Portal SILASTIK",
+      buttonHref: "https://silastik.bps.go.id",
+      buttonType: "external",
+      buttonStyle: "bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-500/20",
+      hasSparkle: false,
     },
     {
       badge: "Masukan & Aspirasi",

@@ -1,10 +1,9 @@
 "use client";
 
 import {
-  Award,
-  FileCheck2,
-  Map,
   Home,
+  MessageCircle,
+  Video,
   ExternalLink,
   Layers,
   CheckCircle2,
@@ -14,6 +13,10 @@ import {
   Building2,
   ArrowRight,
 } from "lucide-react";
+
+/** Tautan chat WhatsApp resmi bot Beregam BPS Musi Rawas. */
+const TAUTAN_BEREGAM =
+  "https://api.whatsapp.com/message/NOQBDW2IPPY4D1?autoload=1&app_absent=0";
 
 /**
  * Layanan nasional BPS RI.
@@ -72,7 +75,7 @@ const WARNA: Record<string, { kotak: string; centang: string; tombol: string }> 
   },
 };
 
-export default function SpecialServicesSection({ tahunSkd }: { tahunSkd: number }) {
+export default function SpecialServicesSection() {
   return (
     <section id="layanan-khusus" className="py-24 bg-slate-100/70 relative overflow-hidden">
       {/* Background Decor */}
@@ -90,101 +93,13 @@ export default function SpecialServicesSection({ tahunSkd }: { tahunSkd: number 
             Layanan Khusus & Program Inovasi Statistik
           </h2>
           <p className="mt-4 text-base text-slate-600">
-            Akses ke sistem rekomendasi statistik sektoral (ROMANTIK), Survei Kebutuhan Data (SKD), Silastik data mikro, dan program Desa Cinta Statistik (Desa Cantik).
+            Program pembinaan Desa Cinta Statistik (Desa Cantik), asisten WhatsApp Beregam, dan layanan konsultasi data virtual (ViDCon) BPS Musi Rawas.
           </p>
         </div>
 
-        {/* Grid 2x2 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Card 1: ROMANTIK (Rekomendasi Statistik) */}
-          <div
-            className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between hover:-translate-y-[4px] transition-transform duration-200"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
-                  <Award className="w-6 h-6" />
-                </div>
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">
-                  PP No. 51 Tahun 1999
-                </span>
-              </div>
-
-              <h3 className="text-xl font-bold text-slate-900 mb-2">
-                ROMANTIK (Rekomendasi Kegiatan Statistik)
-              </h3>
-              <p className="text-sm text-slate-600 leading-relaxed mb-6">
-                Layanan masukan dan rekomendasi BPS terhadap rancangan kegiatan survei statistik sektoral yang diselenggarakan oleh Kementerian, Lembaga, dan Organisasi Perangkat Daerah (OPD) Musi Rawas.
-              </p>
-
-              <div className="space-y-2 mb-6 text-xs text-slate-600">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <span>Pemberitahuan rencana survei sektoral ke BPS</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <span>Penjaminan kualitas metodologi & standar statistik</span>
-                </div>
-              </div>
-            </div>
-
-            <a
-              href="https://romantik.web.bps.go.id"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full inline-flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all"
-            >
-              <span>Akses Portal ROMANTIK BPS</span>
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </div>
-
-          {/* Card 2: SKD (Survei Kebutuhan Data) */}
-          <div
-            className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between hover:-translate-y-[4px] transition-transform duration-200"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-2xl bg-cyan-600 text-white flex items-center justify-center shadow-md shadow-cyan-500/20">
-                  <FileCheck2 className="w-6 h-6" />
-                </div>
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-cyan-100 text-cyan-800">
-                  Evaluasi Kepuasan & Anti Korupsi
-                </span>
-              </div>
-
-              <h3 className="text-xl font-bold text-slate-900 mb-2">
-                Survei Kebutuhan Data (SKD {tahunSkd})
-              </h3>
-              <p className="text-sm text-slate-600 leading-relaxed mb-6">
-                Survei tahunan untuk mengukur persepsi konsumen data mengenai kualitas pelayanan PST, kualitas data BPS, serta Indeks Persepsi Anti Korupsi (IPAK) BPS Musi Rawas.
-              </p>
-
-              <div className="space-y-2 mb-6 text-xs text-slate-600">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-cyan-600 shrink-0" />
-                  <span>Evaluasi langsung kualitas pelayanan publik</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-cyan-600 shrink-0" />
-                  <span>Masukan penyediaan indikator data statistik terbaru</span>
-                </div>
-              </div>
-            </div>
-
-            <a
-              href="https://skd.bps.go.id/skd/s/1605"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full inline-flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs shadow-md transition-all"
-            >
-              <span>Isi Kuesioner SKD {tahunSkd}</span>
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </div>
-
-          {/* Card 3: Desa Cantik */}
+        {/* Grid 3 kolom */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Card 1: Desa Cantik */}
           <div
             className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between hover:-translate-y-[4px] transition-transform duration-200"
           >
@@ -228,47 +143,89 @@ export default function SpecialServicesSection({ tahunSkd }: { tahunSkd: number 
             </a>
           </div>
 
-          {/* Card 4: Silastik & Data Wilkerstat */}
+          {/* Card 2: Beregam (Bot WhatsApp) */}
           <div
             className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between hover:-translate-y-[4px] transition-transform duration-200"
           >
             <div>
               <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
-                  <Map className="w-6 h-6" />
+                <div className="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center shadow-md shadow-teal-500/20">
+                  <MessageCircle className="w-6 h-6" />
                 </div>
-                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">
-                  SILASTIK BPS RI
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-teal-100 text-teal-700">
+                  WhatsApp Bot Resmi BPS
                 </span>
               </div>
 
               <h3 className="text-xl font-bold text-slate-900 mb-2">
-                Data Mikro & Peta Digital Wilkerstat
+                Beregam (Bot WhatsApp Layanan)
               </h3>
               <p className="text-sm text-slate-600 leading-relaxed mb-6">
-                Permohonan data mikro terarsip, publikasi cetakan resmi, dan peta digital Wilayah Kerja Statistik (Wilkerstat) BPS untuk pemetaan spasial & penelitian mendalam.
+                Asisten WhatsApp otomatis BPS Musi Rawas untuk tanya jawab layanan statistik, permohonan data, dan pengaduan langsung dari chat WhatsApp Anda.
               </p>
 
               <div className="space-y-2 mb-6 text-xs text-slate-600">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Akses data micro anonymized riset akademik</span>
+                  <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
+                  <span>Respon cepat 24/7 lewat WhatsApp</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Batas wilayah kerja & peta spasial digital</span>
+                  <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
+                  <span>Terhubung ke petugas PST bila diperlukan</span>
                 </div>
               </div>
             </div>
 
             <a
-              href="https://silastik.bps.go.id"
+              href={TAUTAN_BEREGAM}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full inline-flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-all"
+              className="w-full inline-flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-md transition-all"
             >
-              <span>Akses Portal SILASTIK BPS</span>
+              <span>Chat dengan Beregam</span>
               <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
+
+          {/* Card 3: ViDCon */}
+          <div
+            className="glass-card p-8 rounded-3xl border border-slate-200 shadow-md flex flex-col justify-between hover:-translate-y-[4px] transition-transform duration-200"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
+                  <Video className="w-6 h-6" />
+                </div>
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">
+                  Konsultasi Nol Rupiah
+                </span>
+              </div>
+
+              <h3 className="text-xl font-bold text-slate-900 mb-2">
+                ViDCon (Virtual Data Consultation)
+              </h3>
+              <p className="text-sm text-slate-600 leading-relaxed mb-6">
+                Konsultasi data statistik tatap muka virtual dengan petugas PST BPS Musi Rawas, terjadwal sesuai kebutuhan Anda.
+              </p>
+
+              <div className="space-y-2 mb-6 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Jadwal fleksibel sesuai ketersediaan</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Gratis, tanpa dipungut biaya apa pun</span>
+                </div>
+              </div>
+            </div>
+
+            <a
+              href="#vidcon"
+              className="w-full inline-flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all"
+            >
+              <span>Lihat Alur Layanan ViDCon</span>
+              <ArrowRight className="w-4 h-4" />
             </a>
           </div>
         </div>
