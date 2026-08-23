@@ -124,6 +124,40 @@ export const DEFINISI_SETTING = {
     bawaan: "1",
   },
 
+  /*
+   * Fitur yang masih dikembangkan.
+   *
+   * Bawaannya MATI, berbeda dari saklar tampilan lain di atas. Keduanya
+   * belum siap dipakai warga, dan yang belum siap sebaiknya tidak terlihat
+   * lebih dulu - bukan sebaliknya.
+   *
+   * Saklar ini tidak hanya menyembunyikan tombol di halaman depan; halaman
+   * /sinta dan /dashboard ikut tertutup untuk publik. Menyembunyikan
+   * tombolnya saja tidak cukup: tautannya bisa tersimpan di riwayat
+   * peramban, dibagikan, atau terlanjur terindeks mesin pencari.
+   *
+   * Petugas yang sedang login TETAP bisa membukanya untuk memeriksa
+   * kesiapannya, dengan penanda jelas bahwa halaman itu belum tayang.
+   */
+  "tampilan.sinta": {
+    grup: "tampilan",
+    label: "Tampilkan Sinta (asisten AI)",
+    jenis: "saklar",
+    bantuan:
+      "Masih dikembangkan. Selama mati, halaman /sinta tidak bisa dibuka warga - " +
+      "petugas yang login tetap bisa memeriksanya lebih dulu.",
+    bawaan: "0",
+  },
+  "tampilan.dashboard": {
+    grup: "tampilan",
+    label: "Tampilkan Dashboard Data",
+    jenis: "saklar",
+    bantuan:
+      "Masih dikembangkan. Selama mati, halaman /dashboard tidak bisa dibuka warga - " +
+      "petugas yang login tetap bisa memeriksanya lebih dulu.",
+    bawaan: "0",
+  },
+
   // --- Label istilah ---
   // Dipisah ke pengaturan supaya perubahan pembahasaan berikutnya cukup
   // diedit di admin, tidak perlu deploy.

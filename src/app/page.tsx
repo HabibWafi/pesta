@@ -31,6 +31,8 @@ export default async function Home() {
         tampilFaq: aktif(pengaturan["tampilan.faq"]),
         tampilPeta: aktif(pengaturan["tampilan.peta"]),
         tampilInklusi: aktif(pengaturan["tampilan.inklusi"]),
+        tampilSinta: aktif(pengaturan["tampilan.sinta"]),
+        tampilDashboard: aktif(pengaturan["tampilan.dashboard"]),
         googleMapsKey: process.env.GOOGLE_MAPS_EMBED_KEY ?? "",
         /**
          * Tahun berjalan menurut WIB, untuk label Survei Kebutuhan Data.

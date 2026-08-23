@@ -54,6 +54,9 @@ export interface KontenLanding {
   tampilFaq: boolean;
   tampilPeta: boolean;
   tampilInklusi: boolean;
+  /** Fitur yang masih dikembangkan - lihat catatan di src/lib/content/settings.ts */
+  tampilSinta: boolean;
+  tampilDashboard: boolean;
   googleMapsKey: string;
   /** Tahun berjalan WIB, untuk label Survei Kebutuhan Data. */
   tahunSkd: number;
@@ -82,11 +85,15 @@ export default function HomeClient({ konten }: { konten: KontenLanding }) {
         <HeroSection
           onOpenVidcon={() => setVidconOpen(true)}
           onOpenPengaduan={() => setPengaduanOpen(true)}
+          tampilSinta={konten.tampilSinta}
+          tampilDashboard={konten.tampilDashboard}
         />
         <ServicesSection
           onOpenVidcon={() => setVidconOpen(true)}
           onOpenPengaduan={() => setPengaduanOpen(true)}
           onOpenPermintaanData={() => setPermintaanDataOpen(true)}
+          tampilSinta={konten.tampilSinta}
+          tampilDashboard={konten.tampilDashboard}
         />
         {konten.tampilInklusi && <InclusivitySection />}
         <SpecialServicesSection tahunSkd={konten.tahunSkd} />

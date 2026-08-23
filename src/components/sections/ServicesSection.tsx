@@ -12,15 +12,33 @@ import {
   LayoutDashboard
 } from "lucide-react";
 
+/** Kelas kolom per jumlah kartu. Nama kelasnya ditulis utuh supaya ikut ter-build Tailwind. */
+const KOLOM_GRID: Record<number, string> = {
+  1: "lg:grid-cols-1 lg:max-w-md lg:mx-auto",
+  2: "lg:grid-cols-2 lg:max-w-3xl lg:mx-auto",
+  3: "lg:grid-cols-3",
+  4: "lg:grid-cols-4",
+};
+
 interface ServicesSectionProps {
   onOpenVidcon: () => void;
   onOpenPengaduan: () => void;
   onOpenPermintaanData: () => void;
+  /** Fitur yang masih dikembangkan, disaklar dari /admin/konten. */
+  tampilSinta: boolean;
+  tampilDashboard: boolean;
 }
 
-export default function ServicesSection({ onOpenVidcon, onOpenPengaduan, onOpenPermintaanData }: ServicesSectionProps) {
-  const cards = [
+export default function ServicesSection({
+  onOpenVidcon,
+  onOpenPengaduan,
+  onOpenPermintaanData,
+  tampilSinta,
+  tampilDashboard,
+}: ServicesSectionProps) {
+  const semuaKartu = [
     {
+      kunci: "sinta",
       badge: "Asisten Digital Cerdas",
       badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-100",
       icon: Bot,
@@ -35,6 +53,7 @@ export default function ServicesSection({ onOpenVidcon, onOpenPengaduan, onOpenP
       hasSparkle: true,
     },
     {
+      kunci: "dashboard",
       badge: "Visualisasi Data Interaktif",
       badgeColor: "bg-cyan-50 text-cyan-800 border-cyan-100",
       icon: LayoutDashboard,
@@ -83,6 +102,22 @@ export default function ServicesSection({ onOpenVidcon, onOpenPengaduan, onOpenP
     },
   ];
 
+  /*
+   * Fitur yang masih dikembangkan disaring di sini, bukan disembunyikan
+   * lewat CSS. Kartu yang cuma disembunyikan tetap ada di HTML - terbaca
+   * pembaca layar, terindeks mesin pencari, dan tautannya tetap bisa
+   * ditemukan. Untuk sesuatu yang memang belum siap dipakai warga, itu
+   * bukan "tersembunyi".
+   *
+   * Grid-nya memakai lebar otomatis, jadi sisa kartunya merapat sendiri
+   * tanpa meninggalkan ruang kosong.
+   */
+  const cards = semuaKartu.filter((k) => {
+    if (k.kunci === "sinta") return tampilSinta;
+    if (k.kunci === "dashboard") return tampilDashboard;
+    return true;
+  });
+
   return (
     <section id="layanan" className="py-24 bg-white relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -99,8 +134,13 @@ export default function ServicesSection({ onOpenVidcon, onOpenPengaduan, onOpenP
           </p>
         </div>
 
-        {/* Services Grid (Harmonized Glassmorphic 4-Card System) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/*
+          Jumlah kolom mengikuti jumlah kartu yang benar-benar tampil.
+          Dipatok dengan nama kelas utuh, bukan dirangkai dari variabel -
+          Tailwind memindai kode sebagai teks, jadi kelas yang dibentuk saat
+          program berjalan tidak pernah ikut ter-build.
+        */}
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${KOLOM_GRID[cards.length] ?? "lg:grid-cols-4"}`}>
           {cards.map((card, idx) => {
             const Icon = card.icon;
             return (

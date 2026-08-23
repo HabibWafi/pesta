@@ -22,11 +22,19 @@ import {
 interface HeroSectionProps {
   onOpenVidcon: () => void;
   onOpenPengaduan: () => void;
+  /** Fitur yang masih dikembangkan, disaklar dari /admin/konten. */
+  tampilSinta: boolean;
+  tampilDashboard: boolean;
 }
 
-export default function HeroSection({ onOpenVidcon, onOpenPengaduan }: HeroSectionProps) {
+export default function HeroSection({
+  onOpenVidcon,
+  onOpenPengaduan,
+  tampilSinta,
+  tampilDashboard,
+}: HeroSectionProps) {
   // 5 distinct services in the grid showcase (removed the 3 hero CTAs: ViDCon, Pengaduan, Sinta AI)
-  const serviceItems = [
+  const semuaPortal = [
     { 
       name: "SILASTIK BPS", 
       desc: "Data Mikro & Wilkerstat",
@@ -55,23 +63,28 @@ export default function HeroSection({ onOpenVidcon, onOpenPengaduan }: HeroSecti
       href: "#layanan-khusus",
       isInternal: false
     },
-    { 
-      name: "Dashboard Data", 
+    {
+      kunci: "dashboard",
+      name: "Dashboard Data",
       desc: "Visualisasi Strategis",
-      icon: LayoutDashboard, 
+      icon: LayoutDashboard,
       bgColor: "bg-emerald-50 text-emerald-600 border-emerald-200/60",
       href: "/dashboard",
       isInternal: true
     },
-    { 
-      name: "Desa Cantik", 
+    {
+      name: "Desa Cantik",
       desc: "Desa Cinta Statistik",
-      icon: HomeIcon, 
+      icon: HomeIcon,
       bgColor: "bg-amber-50 text-amber-600 border-amber-200/60",
       href: "#layanan-khusus",
       isInternal: false
     },
   ];
+
+  // Disaring, bukan disembunyikan lewat CSS - lihat catatan di
+  // ServicesSection.tsx soal kenapa itu berbeda.
+  const serviceItems = semuaPortal.filter((p) => p.kunci !== "dashboard" || tampilDashboard);
 
   return (
     <section id="hero" className="relative pt-32 pb-20 md:pt-40 md:pb-24 overflow-hidden bg-slate-50">
@@ -159,19 +172,21 @@ export default function HeroSection({ onOpenVidcon, onOpenPengaduan }: HeroSecti
               <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 transition-colors" />
             </button>
 
-            {/* Button 3: Sinta AI Assistant */}
-            <Link
-              href="/sinta"
-              className="group relative flex items-center justify-between gap-2.5 px-5 py-4 rounded-2xl text-xs font-bold text-indigo-950 bg-gradient-to-r from-cyan-300 via-cyan-400 to-indigo-300 hover:from-cyan-200 hover:to-indigo-200 border border-cyan-300/80 shadow-lg shadow-cyan-500/20 transition-all duration-300 hover:-translate-y-1 active:translate-y-0"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-slate-950/10 text-indigo-950 flex items-center justify-center">
-                  <Bot className="w-4 h-4" />
+            {/* Button 3: Sinta AI Assistant - hanya bila sudah dinyalakan dari admin */}
+            {tampilSinta && (
+              <Link
+                href="/sinta"
+                className="group relative flex items-center justify-between gap-2.5 px-5 py-4 rounded-2xl text-xs font-bold text-indigo-950 bg-gradient-to-r from-cyan-300 via-cyan-400 to-indigo-300 hover:from-cyan-200 hover:to-indigo-200 border border-cyan-300/80 shadow-lg shadow-cyan-500/20 transition-all duration-300 hover:-translate-y-1 active:translate-y-0"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-slate-950/10 text-indigo-950 flex items-center justify-center">
+                    <Bot className="w-4 h-4" />
+                  </div>
+                  <span className="tracking-tight font-extrabold text-left">Sinta AI Bot</span>
                 </div>
-                <span className="tracking-tight font-extrabold text-left">Sinta AI Bot</span>
-              </div>
-              <Sparkles className="w-4 h-4 text-indigo-900 animate-pulse" />
-            </Link>
+                <Sparkles className="w-4 h-4 text-indigo-900 animate-pulse" />
+              </Link>
+            )}
           </Muncul>
 
           {/* Feature Guarantees Badges */}
