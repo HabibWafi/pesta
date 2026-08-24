@@ -474,11 +474,11 @@ async function main() {
   console.log("\nN2. PENILAIAN OTOMATIS SETELAH IDLE DI MENU");
 
   // Sesi dibuat seolah sudah menganggur di menu lebih lama dari ambang
-  // (bawaan 3 menit) - mensimulasikan warga yang membaca jawaban FAQ lalu
+  // (bawaan 10 menit) - mensimulasikan warga yang membaca jawaban FAQ lalu
   // pergi tanpa membalas apa pun.
   sql(
     `UPDATE pesta.beregam_sessions SET mode='bot', state='main_menu', context=NULL, ` +
-      `last_activity_at=UTC_TIMESTAMP(3) - INTERVAL 4 MINUTE WHERE contact_id=${kontakId};`
+      `last_activity_at=UTC_TIMESTAMP(3) - INTERVAL 11 MINUTE WHERE contact_id=${kontakId};`
   );
   const outboxSebelumIdle = Number(
     sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId};`)
@@ -524,7 +524,7 @@ async function main() {
   // sama seperti pesan otomatis lain.
   sql(
     `UPDATE pesta.beregam_sessions SET state='main_menu', context=NULL, ` +
-      `last_activity_at=UTC_TIMESTAMP(3) - INTERVAL 4 MINUTE WHERE contact_id=${kontakId};`
+      `last_activity_at=UTC_TIMESTAMP(3) - INTERVAL 11 MINUTE WHERE contact_id=${kontakId};`
   );
   sql(`UPDATE pesta.beregam_contacts SET opted_out_at=UTC_TIMESTAMP(3) WHERE id=${kontakId};`);
   const outboxSebelumOptOut = Number(

@@ -34,7 +34,7 @@ const configSchema = z.object({
    * memakai bot, lalu ditanya penilaian secara otomatis. Lihat
    * runMaintenance() di services/maintenance.ts.
    */
-  penilaianIdleMinutes: angka(3),
+  penilaianIdleMinutes: angka(10),
 
   /**
    * Pagar pesan basi.
