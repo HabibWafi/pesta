@@ -108,11 +108,13 @@ export const DEFINISI_PESAN = {
     bawaan: "Boleh dituliskan dalam beberapa kata saja ya, secukupnya. 🙏",
   },
   penilaian_minta: {
-    label: "Minta penilaian setelah percakapan selesai",
+    label: "Minta penilaian",
     bantuan:
-      "Dikirim otomatis begitu petugas menandai percakapan selesai. Angka 1-5 yang dibalas warga langsung tersimpan.",
+      "Dikirim otomatis dalam tiga keadaan: petugas menandai percakapan selesai, warga " +
+      "mengetik 'nilai' sendiri, atau warga dibiarkan menganggur di menu selama beberapa " +
+      "menit. Angka 1-5 yang dibalas warga langsung tersimpan.",
     bawaan:
-      "Percakapan Anda sudah diselesaikan petugas kami. 🙏\n\n" +
+      "Terima kasih sudah menghubungi Pelayanan Statistik Terpadu BPS Kabupaten Musi Rawas. 🙏\n\n" +
       "Boleh minta waktunya sebentar? Seberapa puas Anda dengan layanan tadi?\n\n" +
       "Balas dengan *angka 1 sampai 5*:\n" +
       "5 = Sangat puas\n" +
@@ -120,7 +122,9 @@ export const DEFINISI_PESAN = {
       "3 = Cukup\n" +
       "2 = Kurang puas\n" +
       "1 = Tidak puas\n\n" +
-      "Ketik *lewati* bila sedang tidak sempat.",
+      "Ketik *lewati* bila sedang tidak sempat.\n\n" +
+      "📋 Selain itu, kami juga mengundang Anda mengisi Survei Kebutuhan Data (SKD) resmi BPS di:\n" +
+      "https://skd.bps.go.id/skd/s/1605",
   },
   penilaian_terima: {
     label: "Penilaian diterima, tawarkan masukan tertulis",

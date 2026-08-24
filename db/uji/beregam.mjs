@@ -470,6 +470,79 @@ async function main() {
   await webhook(pesanWa("lewati"));
   await jeda(500);
 
+  // === N2. Penilaian otomatis setelah idle di menu =========================
+  console.log("\nN2. PENILAIAN OTOMATIS SETELAH IDLE DI MENU");
+
+  // Sesi dibuat seolah sudah menganggur di menu lebih lama dari ambang
+  // (bawaan 3 menit) - mensimulasikan warga yang membaca jawaban FAQ lalu
+  // pergi tanpa membalas apa pun.
+  sql(
+    `UPDATE pesta.beregam_sessions SET mode='bot', state='main_menu', context=NULL, ` +
+      `last_activity_at=UTC_TIMESTAMP(3) - INTERVAL 4 MINUTE WHERE contact_id=${kontakId};`
+  );
+  const outboxSebelumIdle = Number(
+    sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId};`)
+  );
+
+  // Gerbang pemeliharaan dipaksa terbuka lagi supaya heartbeat berikut ini
+  // BENAR-BENAR menjalankan runMaintenance(), bukan dilewati karena baru
+  // saja jalan lewat webhook-webhook di atas.
+  sql(`UPDATE pesta.beregam_health SET maintenance_ran_at=NULL WHERE id=1;`);
+  await worker("/heartbeat", { method: "POST", body: { workerId: "worker-A", waSessionStatus: "WORKING" } });
+  await jeda(500);
+
+  lapor(
+    "sesi menganggur di menu ditanya penilaian otomatis",
+    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "awaiting_rating_score"
+  );
+  lapor(
+    "  pesan penilaian memuat tautan SKD resmi",
+    sql(
+      `SELECT payload->>'$.text' FROM pesta.beregam_outbox WHERE contact_id=${kontakId} ` +
+        `ORDER BY id DESC LIMIT 1;`
+    ).includes("skd.bps.go.id")
+  );
+
+  // Heartbeat kedua TIDAK boleh menanyakan penilaian sekali lagi - begitu
+  // state berpindah dari main_menu, sesi ini tidak lagi terjaring query
+  // idle-nya, walau last_activity_at masih tua.
+  const jumlahOutboxSetelahPertama = Number(
+    sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId};`)
+  );
+  sql(`UPDATE pesta.beregam_health SET maintenance_ran_at=NULL WHERE id=1;`);
+  await worker("/heartbeat", { method: "POST", body: { workerId: "worker-A", waSessionStatus: "WORKING" } });
+  await jeda(500);
+
+  lapor(
+    "  tidak diulang pada putaran pemeliharaan berikutnya",
+    Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId};`)) ===
+      jumlahOutboxSetelahPertama &&
+      jumlahOutboxSetelahPertama > outboxSebelumIdle
+  );
+
+  // Warga yang sudah menyatakan berhenti TIDAK boleh dikejar penilaian,
+  // sama seperti pesan otomatis lain.
+  sql(
+    `UPDATE pesta.beregam_sessions SET state='main_menu', context=NULL, ` +
+      `last_activity_at=UTC_TIMESTAMP(3) - INTERVAL 4 MINUTE WHERE contact_id=${kontakId};`
+  );
+  sql(`UPDATE pesta.beregam_contacts SET opted_out_at=UTC_TIMESTAMP(3) WHERE id=${kontakId};`);
+  const outboxSebelumOptOut = Number(
+    sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId};`)
+  );
+  sql(`UPDATE pesta.beregam_health SET maintenance_ran_at=NULL WHERE id=1;`);
+  await worker("/heartbeat", { method: "POST", body: { workerId: "worker-A", waSessionStatus: "WORKING" } });
+  await jeda(500);
+
+  lapor(
+    "  warga yang sudah berhenti tidak dikejar penilaian",
+    Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId};`)) ===
+      outboxSebelumOptOut
+  );
+
+  sql(`UPDATE pesta.beregam_contacts SET opted_out_at=NULL WHERE id=${kontakId};`);
+  sql(`UPDATE pesta.beregam_sessions SET state='main_menu', context=NULL WHERE contact_id=${kontakId};`);
+
   // === O. Formulir layanan lewat chat (SATU pesan) ========================
   //
   // Sengaja SATU pesan, bukan tanya-jawab bertahap. Alur bertahap membuat

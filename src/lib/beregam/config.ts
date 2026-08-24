@@ -29,6 +29,14 @@ const configSchema = z.object({
   manualModeTimeoutMinutes: angka(120),
 
   /**
+   * Sesi yang dibiarkan menganggur di menu (bukan sedang mengisi formulir
+   * atau menunggu petugas) selama sekian menit dianggap sudah selesai
+   * memakai bot, lalu ditanya penilaian secara otomatis. Lihat
+   * runMaintenance() di services/maintenance.ts.
+   */
+  penilaianIdleMinutes: angka(3),
+
+  /**
    * Pagar pesan basi.
    *
    * Saat PC pulih dari mati, WhatsApp mengirimkan seluruh pesan tertahan
@@ -131,6 +139,7 @@ export function getConfig(): BeregamConfig {
     webhookHmac: process.env.BEREGAM_WEBHOOK_HMAC,
     sessionTtlMinutes: process.env.BEREGAM_SESSION_TTL_MENIT,
     manualModeTimeoutMinutes: process.env.BEREGAM_MANUAL_TIMEOUT_MENIT,
+    penilaianIdleMinutes: process.env.BEREGAM_PENILAIAN_IDLE_MENIT,
     staleThresholdMinutes: process.env.BEREGAM_STALE_MENIT,
     rateLimit: {
       perMinute: process.env.BEREGAM_RATE_PER_MENIT,

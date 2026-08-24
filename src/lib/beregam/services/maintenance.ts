@@ -1,8 +1,9 @@
-import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   beregamAiJobs,
   beregamAlerts,
+  beregamContacts,
   beregamHandovers,
   beregamHealth,
   beregamMessages,
@@ -109,10 +110,21 @@ export async function runMaintenance(): Promise<void> {
     // --- 1. Outbox yang macet terkunci ------------------------------------
     // Worker mati di tengah pengiriman meninggalkan baris berstatus locked
     // selamanya. Dikembalikan ke pending agar bisa diambil worker lain.
+    //
+    // Jendelanya 5 menit, bukan 2 - dilebarkan setelah ditemukan kasus nyata
+    // warga menerima pesan menu YANG SAMA dua-tiga kali. Penyebabnya bukan
+    // worker mati, tapi ack yang gagal SETELAH pesan sukses terkirim (mis.
+    // sambungan ke PESTA sempat putus sesaat): baris tetap "locked" di sini
+    // padahal WhatsApp-nya sudah terkirim, lalu langkah ini membebaskannya
+    // lagi dan worker mengirim ulang sesuatu yang sebenarnya sudah sampai.
+    // Perbaikan utamanya di worker (percobaan ulang ack, lihat pesta.ts),
+    // jendela yang lebih lebar ini cuma lapis kedua - warga yang benar-benar
+    // menunggu worker pulih dari mati total hanya menunggu 3 menit lebih
+    // lama, jauh lebih murah daripada menerima balasan dobel.
     await db
       .update(beregamOutbox)
       .set({ status: "pending", lockedAt: null, lockedBy: null })
-      .where(and(eq(beregamOutbox.status, "locked"), lt(beregamOutbox.lockedAt, tambahMenit(-2))));
+      .where(and(eq(beregamOutbox.status, "locked"), lt(beregamOutbox.lockedAt, tambahMenit(-5))));
 
     // --- 2. Pekerjaan AI yang macet ---------------------------------------
     await db
@@ -161,6 +173,40 @@ export async function runMaintenance(): Promise<void> {
           lt(beregamMessages.createdAt, tambahMenit(-90 * 24 * 60, sekarang))
         )
       );
+
+    // --- 6. Penilaian otomatis setelah menganggur di menu ------------------
+    // Sebelumnya penilaian hanya ditanyakan lewat kata kunci "nilai" atau
+    // saat petugas menandai percakapan selesai - percakapan yang berhenti
+    // begitu saja di bot (warga membaca jawabannya lalu pergi) tidak pernah
+    // ditanya apa pun. Warga yang dibiarkan di menu (state "main_menu",
+    // bukan sedang mengisi formulir atau menunggu petugas) selama
+    // penilaianIdleMinutes tanpa membalas apa pun dianggap sudah selesai,
+    // lalu ditanya penilaian di sini.
+    //
+    // mintaPenilaian() SENDIRI yang mengganti state sesi keluar dari
+    // "main_menu" begitu terkirim, jadi baris yang sama tidak pernah
+    // terjaring dua kali oleh query ini pada putaran berikutnya.
+    const idleDiMenu = await db
+      .select({ contactId: beregamSessions.contactId })
+      .from(beregamSessions)
+      .innerJoin(beregamContacts, eq(beregamContacts.id, beregamSessions.contactId))
+      .where(
+        and(
+          eq(beregamSessions.state, "main_menu"),
+          lt(beregamSessions.lastActivityAt, tambahMenit(-config.penilaianIdleMinutes, sekarang)),
+          isNull(beregamContacts.optedOutAt),
+          eq(beregamContacts.isBlocked, false)
+        )
+      );
+
+    for (const { contactId } of idleDiMenu) {
+      const [contact] = await db
+        .select()
+        .from(beregamContacts)
+        .where(eq(beregamContacts.id, contactId))
+        .limit(1);
+      if (contact) await getBeregamService().mintaPenilaian(contact, null);
+    }
   } catch (error) {
     console.error("[beregam] pemeliharaan gagal:", error);
     await nyalakanAlert(
