@@ -67,32 +67,31 @@ export default function HeroSection({
 }: HeroSectionProps) {
   // Portal pada grid showcase - jumlah yang tampil dihitung dari serviceItems.length, bukan angka tetap.
   const semuaPortal = [
-    { 
-      name: "SILASTIK BPS", 
+    {
+      name: "SILASTIK BPS",
       desc: "Data Mikro & Wilkerstat",
-      icon: Database, 
+      icon: Database,
       bgColor: "bg-blue-50 text-blue-600 border-blue-200/60",
-      href: "#layanan-khusus",
-      isInternal: false
-    },
-    { 
-      name: "ROMANTIK", 
-      desc: "Rekomendasi Statistik",
-      icon: Award, 
-      bgColor: "bg-indigo-50 text-indigo-600 border-indigo-200/60",
-      href: "#layanan-khusus",
+      href: "https://silastik.bps.go.id",
       isInternal: false
     },
     {
-      // Tanpa tahun dengan sengaja. Kartu ini hanya pintasan ke bagian
-      // "Layanan Khusus" di bawah, dan tahunnya sudah tertulis di kartu SKD
-      // yang sebenarnya - dua tempat yang menyebut tahun berarti dua tempat
-      // yang bisa berbeda saat pergantian tahun.
+      name: "ROMANTIK",
+      desc: "Rekomendasi Statistik",
+      icon: Award,
+      bgColor: "bg-indigo-50 text-indigo-600 border-indigo-200/60",
+      href: "https://romantik.web.bps.go.id",
+      isInternal: false
+    },
+    {
+      // Tanpa tahun dengan sengaja - tahunnya sudah tertulis di kartu SKD
+      // yang sebenarnya (ServicesSection). Dua tempat yang menyebut tahun
+      // berarti dua tempat yang bisa berbeda saat pergantian tahun.
       name: "SKD",
       desc: "Survei Kebutuhan Data",
-      icon: FileCheck2, 
+      icon: FileCheck2,
       bgColor: "bg-cyan-50 text-cyan-600 border-cyan-200/60",
-      href: "#layanan-khusus",
+      href: "https://skd.bps.go.id/skd/s/1605",
       isInternal: false
     },
     {
@@ -109,7 +108,7 @@ export default function HeroSection({
       desc: "Desa Cinta Statistik",
       icon: HomeIcon,
       bgColor: "bg-amber-50 text-amber-600 border-amber-200/60",
-      href: "#layanan-khusus",
+      href: "https://descan1605.bpskabmusirawas.com",
       isInternal: false
     },
     {

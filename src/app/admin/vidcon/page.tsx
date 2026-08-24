@@ -11,7 +11,6 @@ import {
   X,
   Clock,
   Calendar,
-  Phone,
   Building,
   MessageCircle,
   Globe,
@@ -432,10 +431,6 @@ export default function AdminVidconPage() {
                       <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-300 truncate mt-0.5" title={item.asalInstansi}>
                         <Building className="w-3 h-3 text-indigo-500 dark:text-indigo-400 shrink-0" />
                         <span className="truncate">{item.asalInstansi}</span>
-                      </p>
-                      <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-300 truncate mt-0.5" title={item.noHp}>
-                        <Phone className="w-3 h-3 text-indigo-500 dark:text-indigo-400 shrink-0" />
-                        <span className="truncate">{item.noHp}</span>
                       </p>
                     </td>
 
