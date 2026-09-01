@@ -173,6 +173,18 @@ async function main() {
 
   const isiMenu = sql(`SELECT payload FROM pesta.beregam_outbox WHERE contact_id=${kontakId} ORDER BY id LIMIT 1;`);
   lapor("  menu memuat pilihan petugas", isiMenu.includes("Bicara dengan petugas"));
+  lapor(
+    "  menu memuat List Message interaktif",
+    sql(
+      `SELECT JSON_UNQUOTE(JSON_EXTRACT(payload, '$.list.button')) FROM pesta.beregam_outbox ` +
+        `WHERE contact_id=${kontakId} ORDER BY id LIMIT 1;`
+    ) === "Pilih layanan" &&
+      sql(
+        `SELECT JSON_UNQUOTE(JSON_EXTRACT(payload, '$.list.sections[0].rows[0].rowId')) ` +
+          `FROM pesta.beregam_outbox WHERE contact_id=${kontakId} ORDER BY id LIMIT 1;`
+      ) === "menu:1" &&
+      isiMenu.includes("Bicara dengan petugas")
+  );
 
   // Sapaan pertama tidak boleh terjadwal beberapa detik ke depan. Sempat
   // begitu: PESTA menunda jadwalnya sendiri (jedaAcakDetik, 3-8 detik) DI
@@ -187,11 +199,12 @@ async function main() {
     `${detikTerjadwal} detik ke depan`
   );
 
-  // Pilih menu 1
-  await webhook(pesanWa("1"));
+  // NOWEB mengirim judul baris List Message sebagai body. Bot harus dapat
+  // membacanya, sementara angka manual tetap diuji oleh bagian lain.
+  await webhook(pesanWa("1. Jam layanan & lokasi kantor"));
   await jeda(400);
   const adaJamLayanan = sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakId} AND payload LIKE '%Jam Layanan%';`);
-  lapor("menu 1 menjawab jam layanan", Number(adaJamLayanan) > 0);
+  lapor("klik List Message menu 1 menjawab jam layanan", Number(adaJamLayanan) > 0);
 
   // === D. UJI TERPENTING: mode manual =====================================
   console.log("\nD. MODE MANUAL - bot harus DIAM TOTAL");
@@ -396,11 +409,11 @@ async function main() {
   // butuh sesi login yang bukan cakupan uji ini.
   sql(`UPDATE pesta.beregam_sessions SET mode='bot', state='awaiting_rating_score', context='{"handoverId":null}', expires_at=UTC_TIMESTAMP(3) + INTERVAL 30 MINUTE WHERE contact_id=${kontakId};`);
 
-  await webhook(pesanWa("5"));
+  await webhook(pesanWa("5. Sangat puas"));
   await jeda(500);
 
   lapor(
-    "skor 1-5 tersimpan sebagai penilaian",
+    "klik List Message penilaian menyimpan skor 1-5",
     sql(`SELECT skor FROM pesta.beregam_penilaian WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`) === "5"
   );
   lapor(
@@ -458,6 +471,13 @@ async function main() {
   lapor(
     "kata kunci 'nilai' membuka penilaian tanpa perlu petugas",
     sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "awaiting_rating_score"
+  );
+  lapor(
+    "  penilaian memakai List Message interaktif",
+    sql(
+      `SELECT JSON_UNQUOTE(JSON_EXTRACT(payload, '$.list.button')) FROM pesta.beregam_outbox ` +
+        `WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`
+    ) === "Pilih penilaian"
   );
 
   await webhook(pesanWa("4"));

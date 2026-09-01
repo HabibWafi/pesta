@@ -130,6 +130,27 @@ export const outboxItemSchema = z.object({
     text: z.string().optional(),
     header: z.string().optional(),
     items: z.array(z.string()).optional(),
+    /** List Message interaktif WAHA; `text` tetap wajib sebagai fallback. */
+    list: z
+      .object({
+        title: z.string(),
+        description: z.string().optional(),
+        footer: z.string().optional(),
+        button: z.string(),
+        sections: z.array(
+          z.object({
+            title: z.string(),
+            rows: z.array(
+              z.object({
+                title: z.string(),
+                rowId: z.string(),
+                description: z.string().nullable().optional(),
+              })
+            ),
+          })
+        ),
+      })
+      .optional(),
   }),
   /** Detik jeda acak yang sudah diperhitungkan PESTA. */
   delaySeconds: z.number().int().min(0).default(0),

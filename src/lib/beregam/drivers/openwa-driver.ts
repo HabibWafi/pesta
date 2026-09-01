@@ -43,15 +43,46 @@ export class OpenWaDriver implements BeregamGateway {
     items: string[],
     opts: OpsiKirim = {}
   ): Promise<BeregamOutbox> {
-    // Menu dikirim sebagai teks biasa berisi daftar bernomor. Tombol
-    // interaktif WhatsApp tidak dipakai: dukungannya berbeda-beda antar
-    // versi aplikasi, dan angka yang diketik selalu bisa dibaca semua orang.
     const teks = [header, "", ...items].join("\n");
+    const rows = items.flatMap((item) => {
+      const cocok = item.trim().match(/^(\d{1,2})\.\s+(.+)$/);
+      if (!cocok) return [];
+      const nomor = cocok[1];
+      const judul = cocok[2];
+      return [
+        {
+          // Nomor sengaja tetap di depan. NOWEB mengirim judul baris sebagai
+          // body balasan; parser Beregam lalu mengambil angka ini. Jika bentuk
+          // payload WAHA berubah, warga tetap melihat pilihan yang dimaksud.
+          title: `${nomor}. ${judul}`.slice(0, 72),
+          rowId: `menu:${nomor}`,
+          description: null,
+        },
+      ];
+    });
+
+    // Dokumentasi WAHA menyebut List Message dapat sewaktu-waktu gagal.
+    // Karena itu deskripsinya juga memuat menu teks lengkap. Bila tombol
+    // daftar tidak dirender aplikasi WhatsApp tertentu, warga tetap dapat
+    // membalas angka persis seperti mekanisme lama.
+    const list =
+      rows.length > 0
+        ? {
+            title: opts.interactive?.title ?? "Menu Layanan Beregam",
+            description: teks,
+            footer: opts.interactive?.footer ?? "BPS Kabupaten Musi Rawas",
+            button: opts.interactive?.button ?? "Pilih layanan",
+            sections: [
+              { title: opts.interactive?.sectionTitle ?? "Layanan tersedia", rows },
+            ],
+          }
+        : undefined;
+
     return this.antre(
       contactId,
       waId,
       "menu",
-      { text: teks, header, items, source: opts.source ?? null },
+      { text: teks, header, items, ...(list ? { list } : {}), source: opts.source ?? null },
       opts
     );
   }

@@ -232,8 +232,13 @@ export class BeregamService {
     }
 
     // --- LANGKAH 9: pilihan menu -------------------------------------------
-    if (sesi.state === "main_menu" && /^[1-9][0-9]?$/.test(bersih)) {
-      const terjawab = await this.jawabMenu(contact, sesi, bersih);
+    // Balasan List Message NOWEB berisi judul baris, misalnya
+    // "3. Konsultasi statistik (ViDCon)". Angka manual tetap diterima agar
+    // bot tidak bergantung pada komponen interaktif yang menurut dokumentasi
+    // WAHA dapat sewaktu-waktu tidak dirender oleh WhatsApp.
+    const pilihanMenu = bersih.match(/^([1-9][0-9]?)(?:\.|\s|$)/)?.[1] ?? null;
+    if (sesi.state === "main_menu" && pilihanMenu) {
+      const terjawab = await this.jawabMenu(contact, sesi, pilihanMenu);
       if (terjawab) return;
     }
 
@@ -739,7 +744,29 @@ export class BeregamService {
       })
       .where(eq(beregamSessions.id, sesi.id));
 
-    await this.balas(contact, await ambilPesan("penilaian_minta"), "bot");
+    await this.gateway.queueMenu(
+      contact.id,
+      contact.waId,
+      await ambilPesan("penilaian_minta"),
+      [
+        "5. Sangat puas",
+        "4. Puas",
+        "3. Cukup",
+        "2. Kurang puas",
+        "1. Tidak puas",
+        "",
+        "Ketik lewati bila sedang tidak sempat.",
+      ],
+      {
+        source: "bot",
+        interactive: {
+          title: "Penilaian Layanan Beregam",
+          button: "Pilih penilaian",
+          sectionTitle: "Tingkat kepuasan",
+          footer: "Survei layanan BPS Kabupaten Musi Rawas",
+        },
+      }
+    );
   }
 
   /** Menerima angka 1-5. Balasan lain memulangkan warga ke menu, bukan menahannya. */
@@ -753,7 +780,8 @@ export class BeregamService {
       return;
     }
 
-    const skor = Number(bersih);
+    const pilihanSkor = bersih.match(/^([1-5])(?:\.|\s|$)/)?.[1] ?? bersih;
+    const skor = Number(pilihanSkor);
     if (!Number.isInteger(skor) || skor < 1 || skor > 5) {
       /*
        * Bukan angka 1-5, dan bukan kata melewati.

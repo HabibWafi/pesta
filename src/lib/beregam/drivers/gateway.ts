@@ -18,6 +18,13 @@ export interface OpsiKirim {
   sentBy?: number;
   /** Asal balasan, untuk jejak audit dan metrik per fase. */
   source?: SumberPesan;
+  /** Teks antarmuka List Message; kosong berarti memakai label menu utama. */
+  interactive?: {
+    title: string;
+    button: string;
+    sectionTitle: string;
+    footer?: string;
+  };
 }
 
 export interface BeregamGateway {
@@ -29,7 +36,7 @@ export interface BeregamGateway {
     opts?: OpsiKirim
   ): Promise<BeregamOutbox>;
 
-  /** Mengantre menu bernomor. */
+  /** Mengantre List Message interaktif dengan menu teks sebagai fallback. */
   queueMenu(
     contactId: number,
     waId: string,
