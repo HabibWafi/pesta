@@ -782,6 +782,7 @@ function DetailPercakapan({ id, onClose, onBerubah }: { id: number; onClose: () 
   const [kontak, setKontak] = useState<BarisPercakapan | null>(null);
   const [pesan, setPesan] = useState<PesanThread[]>([]);
   const [handoverAktif, setHandoverAktif] = useState<{ id: number; status: string; reason: string } | null>(null);
+  const [modeSesi, setModeSesi] = useState<"bot" | "manual">("bot");
   const [balasan, setBalasan] = useState("");
   const [mengirim, setMengirim] = useState(false);
   const [menyelesaikan, setMenyelesaikan] = useState(false);
@@ -795,6 +796,7 @@ function DetailPercakapan({ id, onClose, onBerubah }: { id: number; onClose: () 
       if (!json.success) throw new Error(json.message);
       setKontak(json.kontak);
       setPesan(json.pesan);
+      setModeSesi(json.sesi?.mode === "manual" ? "manual" : "bot");
       const terbuka = (json.handovers as { id: number; status: string; reason: string }[]).find(
         (h) => h.status === "open" || h.status === "claimed"
       );
@@ -854,6 +856,7 @@ function DetailPercakapan({ id, onClose, onBerubah }: { id: number; onClose: () 
       const json = await res.json();
       if (!json.success) throw new Error(json.message ?? "Gagal menandai selesai");
       toast.success("Percakapan ditandai selesai - bot aktif kembali untuk kontak ini");
+      setModeSesi("bot");
       void ambil();
       onBerubah();
     } catch (err) {
@@ -872,7 +875,7 @@ function DetailPercakapan({ id, onClose, onBerubah }: { id: number; onClose: () 
             {kontak?.name && <p className="text-xs text-slate-500">+{kontak.phone}</p>}
           </div>
           <div className="flex items-center gap-2">
-            {handoverAktif && (
+            {(handoverAktif || modeSesi === "manual") && (
               <button
                 onClick={selesaikan}
                 disabled={menyelesaikan}
@@ -890,6 +893,13 @@ function DetailPercakapan({ id, onClose, onBerubah }: { id: number; onClose: () 
         {handoverAktif && (
           <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-100 text-xs text-amber-800">
             <span className="font-semibold">Alasan eskalasi:</span> {handoverAktif.reason}
+          </div>
+        )}
+
+        {!handoverAktif && modeSesi === "manual" && (
+          <div className="px-4 py-2.5 bg-indigo-50 border-b border-indigo-100 text-xs text-indigo-800">
+            Percakapan sedang dalam mode manual. Tekan <span className="font-semibold">Tandai Selesai</span>{" "}
+            agar bot aktif kembali dan warga dapat memakai layanan lain.
           </div>
         )}
 

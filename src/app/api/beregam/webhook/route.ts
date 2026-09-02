@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { findOrCreateContactByWaId, pesanSudahAda, pesanTerakhir } from "@/lib/beregam/db/queries";
 import { webhookSah, HEADER_WEBHOOK_HMAC } from "@/lib/beregam/auth";
@@ -7,7 +7,7 @@ import { webhookPayloadSchema } from "@/lib/beregam/contracts";
 import { namaProfil, nomorAsli } from "@/lib/beregam/identitas";
 import { getConfig } from "@/lib/beregam/config";
 import { getBeregamService } from "@/lib/beregam/services/beregam-service";
-import { beregamSessions } from "@/lib/beregam/db/schema";
+import { beregamHandovers, beregamSessions } from "@/lib/beregam/db/schema";
 import { samarkanNomor } from "@/lib/waktu";
 
 export const dynamic = "force-dynamic";
@@ -145,10 +145,36 @@ async function proses(
     // ditangani manusia saat PC pulih.
     const masukTerakhir = await pesanTerakhir(contact.id, "in");
     if (masukTerakhir) {
+      const sekarang = new Date();
       await db
         .update(beregamSessions)
-        .set({ mode: "manual", state: "manual", lastActivityAt: new Date() })
+        .set({ mode: "manual", state: "manual", lastActivityAt: sekarang })
         .where(eq(beregamSessions.contactId, contact.id));
+
+      // Balasan langsung dari HP tidak melewati endpoint admin, sehingga
+      // sebelumnya mode manual aktif TANPA handover. Akibatnya tombol
+      // "Tandai Selesai" tidak muncul di inbox. Buat jejak handover bila
+      // belum ada agar percakapan selalu punya jalan penyelesaian.
+      const [aktif] = await db
+        .select({ id: beregamHandovers.id })
+        .from(beregamHandovers)
+        .where(
+          and(
+            eq(beregamHandovers.contactId, contact.id),
+            inArray(beregamHandovers.status, ["open", "claimed"])
+          )
+        )
+        .limit(1);
+
+      if (!aktif) {
+        await db.insert(beregamHandovers).values({
+          contactId: contact.id,
+          channel: "wa",
+          reason: "Ditangani langsung melalui WhatsApp",
+          status: "claimed",
+          claimedAt: sekarang,
+        });
+      }
     }
 
     console.info(

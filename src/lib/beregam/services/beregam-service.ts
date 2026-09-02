@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   beregamContacts,
@@ -49,6 +49,8 @@ import { formatWib, komponenWib, samarkanNomor, tambahMenit } from "@/lib/waktu"
 const KATA_MENU = ["menu", "0", "batal", "kembali", "mulai"];
 const KATA_PETUGAS = ["petugas", "admin", "manusia", "operator", "cs"];
 const KATA_BERHENTI = ["stop", "berhenti", "unsubscribe", "hapus saya"];
+/** Perintah tegas untuk menutup percakapan yang sedang dipegang petugas. */
+const KATA_SELESAI_MANUAL = ["selesai", "akhiri", "akhiri layanan", "layanan selesai"];
 
 /**
  * Membuka penilaian atas kemauan sendiri.
@@ -109,11 +111,15 @@ export class BeregamService {
     //
     // BARIS TERPENTING DI SELURUH MODUL INI.
     //
-    // Saat petugas sedang memegang percakapan, bot HARUS DIAM TOTAL. Tanpa
-    // pemeriksaan ini warga menerima dua jawaban sekaligus - dari petugas
-    // dan dari bot - dan bug itu baru ketahuan setelah petugas mulai
-    // memakai inbox, yaitu saat kepercayaan sudah terlanjur dibangun.
+    // Saat petugas sedang memegang percakapan, bot HARUS DIAM TOTAL. Satu-
+    // satunya pengecualian adalah perintah tegas `selesai`: itu bukan jawaban
+    // layanan, melainkan kendali warga untuk melepaskan mode manual. `menu`
+    // dan angka tetap tidak boleh merebut percakapan dari petugas.
     if (sesi.mode === "manual") {
+      if (KATA_SELESAI_MANUAL.includes(bersih)) {
+        await this.selesaikanLayananManual(contact, sesi);
+        return;
+      }
       await this.sentuhSesi(sesi.id);
       await this.tandaiHandoverBelumDibaca(contact.id);
       return;
@@ -538,7 +544,11 @@ export class BeregamService {
         "Silakan buka WhatsApp Beregam untuk membalas warga tersebut."
     );
 
-    await this.balas(contact, await ambilPesan("eskalasi_jam_kerja"), "bot");
+    const [pesanEskalasi, petunjukSelesai] = await Promise.all([
+      ambilPesan("eskalasi_jam_kerja"),
+      ambilPesan("manual_petunjuk_selesai"),
+    ]);
+    await this.balas(contact, `${pesanEskalasi}\n\n${petunjukSelesai}`, "bot");
 
     console.info(
       `[beregam] eskalasi kontak=${samarkanNomor(contact.phone)} alasan="${alasan}"`
@@ -725,6 +735,61 @@ export class BeregamService {
   // =========================================================================
   // Penilaian layanan
   // =========================================================================
+
+  /**
+   * Mengakhiri mode manual atas permintaan tegas warga.
+   *
+   * Ini sengaja sangat sempit: hanya kata di KATA_SELESAI_MANUAL yang boleh
+   * melewati pagar mode manual. Pesan lain tetap dicatat lalu didiamkan agar
+   * bot tidak menyela petugas yang sedang berbicara.
+   */
+  private async selesaikanLayananManual(
+    contact: BeregamContact,
+    sesi: BeregamSession
+  ): Promise<void> {
+    const [handover] = await db
+      .select({ id: beregamHandovers.id })
+      .from(beregamHandovers)
+      .where(
+        and(
+          eq(beregamHandovers.contactId, contact.id),
+          inArray(beregamHandovers.status, ["open", "claimed"])
+        )
+      )
+      .orderBy(desc(beregamHandovers.id))
+      .limit(1);
+
+    const sekarang = new Date();
+    await db
+      .update(beregamHandovers)
+      .set({
+        status: "resolved",
+        resolvedAt: sekarang,
+        resolutionNote: "Diakhiri oleh pengguna melalui WhatsApp",
+      })
+      .where(
+        and(
+          eq(beregamHandovers.contactId, contact.id),
+          inArray(beregamHandovers.status, ["open", "claimed"])
+        )
+      );
+
+    await db
+      .update(beregamSessions)
+      .set({
+        mode: "bot",
+        state: "idle",
+        context: null,
+        missCount: 0,
+        lastActivityAt: sekarang,
+      })
+      .where(eq(beregamSessions.id, sesi.id));
+
+    // Pertanyaan penilaian sekaligus menjadi konfirmasi bahwa percakapan
+    // manual sudah berakhir. Setelah dijawab atau dilewati, sesi kembali ke
+    // menu utama dan warga bebas memilih layanan lain.
+    await this.mintaPenilaian(contact, handover?.id ?? null);
+  }
 
   /**
    * Menanyakan penilaian, dipanggil saat petugas menandai percakapan selesai.

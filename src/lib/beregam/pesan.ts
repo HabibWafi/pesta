@@ -106,6 +106,15 @@ export const DEFINISI_PESAN = {
       "Mohon tunggu sebentar, pesan Anda sudah masuk ke antrean dan " +
       "petugas akan segera membalas.",
   },
+  manual_petunjuk_selesai: {
+    label: "Petunjuk mengakhiri percakapan dengan petugas",
+    bantuan:
+      "Ditambahkan saat warga mulai disambungkan ke petugas. Kata perintah 'selesai' " +
+      "dikunci oleh sistem dan tidak dapat diganti dari naskah.",
+    bawaan:
+      "Jika kebutuhan Anda sudah selesai ditangani, ketik *selesai*. " +
+      "Bot akan aktif kembali dan Anda dapat memakai layanan lainnya.",
+  },
   eskalasi_luar_jam: {
     label: "Eskalasi ke petugas - di luar jam kerja",
     bantuan: "Variabel {jam_layanan} otomatis diisi jadwal jam kerja dari pengaturan.",

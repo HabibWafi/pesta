@@ -255,8 +255,39 @@ async function main() {
   const agentPhone = sql(`SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakId} AND source='agent_phone';`);
   lapor("balasan dari HP tercatat sebagai agent_phone", agentPhone === "1");
   lapor("  sesi otomatis jadi manual (bot tidak merebut)", sql(`SELECT mode FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "manual");
+  lapor(
+    "  balasan dari HP membuat handover agar tombol selesai tersedia",
+    sql(
+      `SELECT COUNT(*) FROM pesta.beregam_handovers WHERE contact_id=${kontakId} ` +
+        `AND status IN ('open','claimed');`
+    ) === "1"
+  );
 
-  sql(`UPDATE pesta.beregam_sessions SET mode='bot' WHERE contact_id=${kontakId};`);
+  // Selama mode manual, semua isi percakapan tetap didiamkan (bagian D).
+  // Hanya perintah tegas ini yang boleh melepas petugas, supaya warga tidak
+  // terjebak dua jam ketika petugas lupa menekan tombol selesai.
+  await webhook(pesanWa("selesai"));
+  await jeda(500);
+  lapor(
+    "warga dapat mengetik 'selesai' untuk mengakhiri mode manual",
+    sql(`SELECT mode FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "bot" &&
+      sql(
+        `SELECT COUNT(*) FROM pesta.beregam_handovers WHERE contact_id=${kontakId} ` +
+          `AND status IN ('open','claimed');`
+      ) === "0"
+  );
+  lapor(
+    "  setelah selesai, warga langsung diminta penilaian",
+    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) ===
+      "awaiting_rating_score"
+  );
+
+  await webhook(pesanWa("lewati"));
+  await jeda(400);
+  lapor(
+    "  setelah melewati penilaian, warga kembali bebas memakai menu",
+    sql(`SELECT state FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) === "main_menu"
+  );
 
   // === G. Opt-out =========================================================
   console.log("\nG. WARGA MENYATAKAN BERHENTI");
