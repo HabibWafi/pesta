@@ -441,6 +441,89 @@ async function main() {
       )
     );
     lapor("notifikasi terkirim ke WA petugas", jumlahNotifikasi >= 2, `${jumlahNotifikasi} notifikasi`);
+
+    const handoverUtama = sql(
+      `SELECT id FROM pesta.beregam_handovers WHERE contact_id=${kontakId} ` +
+        `AND status IN ('open','claimed') ORDER BY id DESC LIMIT 1;`
+    );
+    lapor(
+      "  notifikasi petugas membawa tombol penyelesaian",
+      sql(
+        `SELECT JSON_UNQUOTE(JSON_EXTRACT(payload, '$.list.button')) FROM pesta.beregam_outbox o ` +
+          `JOIN pesta.beregam_contacts c ON c.id=o.contact_id WHERE c.phone='${nomorStaf}' ` +
+          `AND o.type='menu' ORDER BY o.id DESC LIMIT 1;`
+      ) === "Selesaikan layanan"
+    );
+
+    // Buka permintaan kedua untuk memastikan petugas tidak menutup pengguna
+    // yang salah ketika beberapa layanan berlangsung bersamaan.
+    const waKedua = "6281299887755@c.us";
+    await webhook(
+      pesanWa("petugas", {
+        from: waKedua,
+        pushName: "Warga Uji Kedua",
+      })
+    );
+    await jeda(500);
+    const kontakKedua = sql(
+      `SELECT id FROM pesta.beregam_contacts WHERE wa_id='${waKedua}' LIMIT 1;`
+    );
+    const handoverKedua = sql(
+      `SELECT id FROM pesta.beregam_handovers WHERE contact_id=${kontakKedua} ` +
+        `AND status IN ('open','claimed') ORDER BY id DESC LIMIT 1;`
+    );
+
+    await webhook(
+      pesanWa("layanan", {
+        from: `${nomorStaf}@c.us`,
+        pushName: "Petugas PST Uji",
+      })
+    );
+    await jeda(500);
+    lapor(
+      "petugas dapat meminta daftar percakapan aktif lewat WhatsApp",
+      Number(
+        sql(
+          `SELECT JSON_LENGTH(JSON_EXTRACT(payload, '$.list.sections[0].rows')) ` +
+            `FROM pesta.beregam_outbox o JOIN pesta.beregam_contacts c ON c.id=o.contact_id ` +
+            `WHERE c.phone='${nomorStaf}' AND o.type='menu' ORDER BY o.id DESC LIMIT 1;`
+        )
+      ) >= 2
+    );
+
+    // Bentuk ini sama dengan judul baris yang dikirim kembali oleh NOWEB.
+    await webhook(
+      pesanWa(`${handoverUtama}. Warga Uji`, {
+        from: `${nomorStaf}@c.us`,
+        pushName: "Petugas PST Uji",
+      })
+    );
+    await jeda(700);
+    lapor(
+      "pilihan petugas hanya menyelesaikan handover yang dipilih",
+      sql(`SELECT status FROM pesta.beregam_handovers WHERE id=${handoverUtama};`) ===
+        "resolved" &&
+        ["open", "claimed"].includes(
+          sql(`SELECT status FROM pesta.beregam_handovers WHERE id=${handoverKedua};`)
+        )
+    );
+    lapor(
+      "  pengguna yang dipilih kembali ke bot dan menerima penilaian",
+      sql(`SELECT CONCAT(mode,'|',state) FROM pesta.beregam_sessions WHERE contact_id=${kontakId};`) ===
+        "bot|awaiting_rating_score"
+    );
+    lapor(
+      "  daftar konfirmasi berikutnya hanya memuat layanan yang masih aktif",
+      sql(
+        `SELECT JSON_UNQUOTE(JSON_EXTRACT(payload, '$.list.sections[0].rows[0].title')) ` +
+          `FROM pesta.beregam_outbox o JOIN pesta.beregam_contacts c ON c.id=o.contact_id ` +
+          `WHERE c.phone='${nomorStaf}' AND o.type='menu' ORDER BY o.id DESC LIMIT 1;`
+      ).startsWith(`${handoverKedua}.`)
+    );
+
+    await webhook(pesanWa("lewati"));
+    await jeda(400);
+    sql(`DELETE FROM pesta.beregam_contacts WHERE id=${kontakKedua};`);
     sql(`DELETE FROM pesta.beregam_contacts WHERE phone='${nomorStaf}';`);
   } else {
     console.log("  (BEREGAM_STAFF_WA belum diisi di .env - notifikasi petugas dilewati)");

@@ -115,6 +115,35 @@ export const DEFINISI_PESAN = {
       "Jika kebutuhan Anda sudah selesai ditangani, ketik *selesai*. " +
       "Bot akan aktif kembali dan Anda dapat memakai layanan lainnya.",
   },
+  petugas_kendali_judul: {
+    label: "Kendali petugas - judul daftar",
+    bawaan: "Kendali Layanan Petugas",
+  },
+  petugas_kendali_tombol: {
+    label: "Kendali petugas - tombol penyelesaian",
+    bantuan: "Tombol yang membuka daftar percakapan aktif di WhatsApp petugas.",
+    bawaan: "Selesaikan layanan",
+  },
+  petugas_kendali_bagian: {
+    label: "Kendali petugas - nama kelompok pilihan",
+    bawaan: "Pilih percakapan",
+  },
+  petugas_kendali_petunjuk: {
+    label: "Kendali petugas - petunjuk fallback",
+    bantuan: "Ditampilkan bila List Message tidak dirender oleh aplikasi WhatsApp.",
+    bawaan: "Pilih tombol di atas, atau balas *selesai ID* (contoh: selesai 123).",
+  },
+  petugas_tanpa_layanan: {
+    label: "Kendali petugas - tidak ada layanan aktif",
+    bawaan: "Saat ini tidak ada percakapan petugas yang masih aktif. ✅",
+  },
+  petugas_selesai_konfirmasi: {
+    label: "Kendali petugas - konfirmasi penyelesaian",
+    bantuan: "Variabel {id} dan {pengguna} diisi otomatis oleh sistem.",
+    bawaan:
+      "✅ Layanan #{id} untuk {pengguna} sudah diselesaikan. " +
+      "Pengguna telah dikembalikan ke bot dan diminta mengisi penilaian/SKD.",
+  },
   eskalasi_luar_jam: {
     label: "Eskalasi ke petugas - di luar jam kerja",
     bantuan: "Variabel {jam_layanan} otomatis diisi jadwal jam kerja dari pengaturan.",

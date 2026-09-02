@@ -22,6 +22,12 @@ import { getConfig } from "../config";
 import { getGateway } from "../drivers";
 import { ambilPesan } from "../pesan";
 import { kirimNotifikasiPetugas } from "../notifikasi";
+import {
+  ambilHandoverAktifPetugas,
+  identitasHandover,
+  kirimDaftarKendaliPetugas,
+} from "../kendali-petugas";
+import { keNomorWa } from "../nomor";
 import { pesanPublikasi, pesanTabelStatistik } from "../bps-pesan";
 import {
   deskripsiJamLayanan,
@@ -104,6 +110,14 @@ export class BeregamService {
     // balasan atas pertanyaan yang sudah diselesaikan admin berjam-jam lalu.
     if (opsi.stale) {
       await this.sentuhSesi(sesi.id);
+      return;
+    }
+
+    // Nomor notifikasi petugas adalah kanal kendali terpisah. Pesannya tidak
+    // boleh masuk ke menu warga, terlebih bila petugas sedang memilih salah
+    // satu dari beberapa percakapan yang hendak diselesaikan.
+    if (this.adalahPetugasNotifikasi(contact)) {
+      await this.tanganiKendaliPetugas(contact, bersih);
       return;
     }
 
@@ -517,7 +531,8 @@ export class BeregamService {
         `🔔 *Permintaan bicara dengan petugas* (di luar jam layanan)\n\n` +
           `Nomor: ${nomor}\nWaktu: ${waktu} WIB\nAlasan awal: ${alasan}\n\n` +
           "Pengunjung sedang diminta menuliskan keperluannya. Notifikasi " +
-          "susulan menyusul begitu mereka membalas."
+          "susulan menyusul begitu mereka membalas.",
+        true
       );
 
       await this.balas(
@@ -541,7 +556,8 @@ export class BeregamService {
     await this.notifyStaff(
       `🔔 *Permintaan bicara dengan petugas*\n\n` +
         `Nomor: ${nomor}\nWaktu: ${waktu} WIB\nAlasan: ${alasan}\n\n` +
-        "Silakan buka WhatsApp Beregam untuk membalas warga tersebut."
+        "Silakan buka WhatsApp Beregam untuk membalas warga tersebut.",
+      true
     );
 
     const [pesanEskalasi, petunjukSelesai] = await Promise.all([
@@ -587,7 +603,8 @@ export class BeregamService {
         `Nomor: ${contact.phone ? `+${contact.phone}` : "(tidak terbaca, balas lewat inbox PESTA)"}\n` +
           `Pesan: "${keterangan.slice(0, 300)}"\n\n` +
         "Balas langsung dari WhatsApp Beregam kalau dirasa penting, atau " +
-        "tunggu sampai jam kerja berikutnya."
+        "tunggu sampai jam kerja berikutnya.",
+      true
     );
 
     await this.balas(
@@ -735,6 +752,118 @@ export class BeregamService {
   // =========================================================================
   // Penilaian layanan
   // =========================================================================
+
+  /** Nomor ini satu-satunya yang boleh memakai perintah kendali petugas. */
+  private adalahPetugasNotifikasi(contact: BeregamContact): boolean {
+    const nomorPetugas = getConfig().staffWaNumber;
+    if (!nomorPetugas) return false;
+
+    const nomorKontak = keNomorWa(contact.phone);
+    return nomorKontak.ok && nomorKontak.wa === nomorPetugas;
+  }
+
+  /**
+   * Menangani pesan dari nomor petugas: membuka daftar atau menyelesaikan
+   * handover tertentu. ID wajib tervalidasi masih aktif sebelum diubah.
+   */
+  private async tanganiKendaliPetugas(
+    staf: BeregamContact,
+    perintah: string
+  ): Promise<void> {
+    const idTeks =
+      perintah.match(/^selesai\s*(?:#|id\s*)?(\d+)\b/)?.[1] ??
+      perintah.match(/^menu:(\d+)$/)?.[1] ??
+      perintah.match(/^(\d+)\.\s+/)?.[1] ??
+      perintah.match(/^#(\d+)\b/)?.[1];
+
+    if (!idTeks) {
+      await kirimDaftarKendaliPetugas(
+        staf,
+        "Berikut percakapan yang masih menunggu penyelesaian petugas. " +
+          "Pilih pengguna yang benar sebelum menutup layanan."
+      );
+      return;
+    }
+
+    const id = Number(idTeks);
+    const [handover] = await db
+      .select()
+      .from(beregamHandovers)
+      .where(
+        and(
+          eq(beregamHandovers.id, id),
+          inArray(beregamHandovers.status, ["open", "claimed"])
+        )
+      )
+      .limit(1);
+
+    if (!handover) {
+      await kirimDaftarKendaliPetugas(
+        staf,
+        `Layanan #${id} tidak ditemukan atau sudah selesai. Pilih dari daftar aktif berikut.`
+      );
+      return;
+    }
+
+    const [pengguna] = await db
+      .select()
+      .from(beregamContacts)
+      .where(eq(beregamContacts.id, handover.contactId))
+      .limit(1);
+
+    if (!pengguna) {
+      await kirimDaftarKendaliPetugas(
+        staf,
+        `Kontak untuk layanan #${id} tidak ditemukan. Data tidak diubah.`
+      );
+      return;
+    }
+
+    const sekarang = new Date();
+    await db
+      .update(beregamHandovers)
+      .set({
+        status: "resolved",
+        resolvedAt: sekarang,
+        resolutionNote: "Diselesaikan petugas melalui kendali WhatsApp",
+      })
+      .where(eq(beregamHandovers.id, id));
+
+    await db
+      .update(beregamSessions)
+      .set({
+        mode: "bot",
+        state: "idle",
+        context: null,
+        missCount: 0,
+        lastActivityAt: sekarang,
+      })
+      .where(eq(beregamSessions.contactId, pengguna.id));
+
+    await this.mintaPenilaian(pengguna, id);
+
+    const ringkasan = {
+      id,
+      contactId: pengguna.id,
+      nama: pengguna.name,
+      nomor: pengguna.phone,
+      alasan: handover.reason,
+    };
+    const konfirmasi = await ambilPesan("petugas_selesai_konfirmasi", {
+      id: String(id),
+      pengguna: identitasHandover(ringkasan),
+    });
+    const sisa = await ambilHandoverAktifPetugas();
+
+    if (sisa.length > 0) {
+      await kirimDaftarKendaliPetugas(
+        staf,
+        `${konfirmasi}\n\nMasih ada ${sisa.length} percakapan aktif. Pilih bila ada yang juga sudah selesai.`
+      );
+    } else {
+      await this.gateway.queueText(staf.id, staf.waId, konfirmasi, { source: "bot" });
+    }
+  }
 
   /**
    * Mengakhiri mode manual atas permintaan tegas warga.
@@ -994,8 +1123,8 @@ export class BeregamService {
    * Gagal diam-diam bila BEREGAM_STAFF_WA belum diisi - modul tetap
    * berfungsi tanpa nomor ini, hanya notifikasinya yang tidak terkirim.
    */
-  private async notifyStaff(teks: string): Promise<void> {
-    await kirimNotifikasiPetugas(teks);
+  private async notifyStaff(teks: string, kendaliHandover = false): Promise<void> {
+    await kirimNotifikasiPetugas(teks, { kendaliHandover });
   }
 
   /** Menandai handover terbuka agar muncul sebagai belum dibaca di inbox. */

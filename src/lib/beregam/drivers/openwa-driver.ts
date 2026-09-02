@@ -45,7 +45,7 @@ export class OpenWaDriver implements BeregamGateway {
   ): Promise<BeregamOutbox> {
     const teks = [header, "", ...items].join("\n");
     const rows = items.flatMap((item) => {
-      const cocok = item.trim().match(/^(\d{1,2})\.\s+(.+)$/);
+      const cocok = item.trim().match(/^(\d{1,10})\.\s+(.+)$/);
       if (!cocok) return [];
       const nomor = cocok[1];
       const judul = cocok[2];

@@ -2,14 +2,16 @@ import { findOrCreateContactByWaId } from "./db/queries";
 import { getGateway } from "./drivers";
 import { getConfig } from "./config";
 import { formatWib, samarkanNomor } from "@/lib/waktu";
+import { kirimDaftarKendaliPetugas } from "./kendali-petugas";
 
 /**
  * Notifikasi WhatsApp ke petugas piket.
  *
  * Nomor petugas (BEREGAM_STAFF_WA) sengaja BERBEDA dari nomor bot. Pesan di
- * sini murni pemberitahuan "ada yang perlu ditindaklanjuti"; petugas tetap
- * melayani warga lewat panel PESTA atau lewat WhatsApp Beregam, bukan
- * membalas dari nomor penerima notifikasi ini.
+ * sini memberi tahu "ada yang perlu ditindaklanjuti". Untuk handover
+ * percakapan, notifikasi juga membawa List Message yang dapat dipakai petugas
+ * menandai layanan selesai. Balasan layanan kepada warga tetap dilakukan
+ * lewat panel PESTA atau HP yang memegang nomor Beregam.
  *
  * Dipakai dua tempat yang berbeda sifatnya, dan itu disengaja:
  *
@@ -30,7 +32,10 @@ import { formatWib, samarkanNomor } from "@/lib/waktu";
  * yang sudah berhasil masuk database. Pemanggil boleh memakainya tanpa
  * membungkusnya lagi.
  */
-export async function kirimNotifikasiPetugas(teks: string): Promise<void> {
+export async function kirimNotifikasiPetugas(
+  teks: string,
+  opsi: { kendaliHandover?: boolean } = {}
+): Promise<void> {
   try {
     const nomor = getConfig().staffWaNumber;
     if (!nomor) {
@@ -39,7 +44,11 @@ export async function kirimNotifikasiPetugas(teks: string): Promise<void> {
     }
 
     const staf = await findOrCreateContactByWaId(`${nomor}@c.us`, "Petugas PST (notifikasi)");
-    await getGateway().queueText(staf.id, staf.waId, teks, { source: "bot" });
+    if (opsi.kendaliHandover) {
+      await kirimDaftarKendaliPetugas(staf, teks);
+    } else {
+      await getGateway().queueText(staf.id, staf.waId, teks, { source: "bot" });
+    }
   } catch (error) {
     // Termasuk kasus modul Beregam belum dikonfigurasi sama sekali di server
     // ini - getConfig() akan melempar, dan formulir web tetap harus jalan.
