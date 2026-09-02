@@ -24,6 +24,8 @@ export interface OpsiKirim {
     button: string;
     sectionTitle: string;
     footer?: string;
+    /** Isi yang tampil di kartu List Message; fallback teks tetap memakai menu lengkap. */
+    description?: string;
   };
 }
 

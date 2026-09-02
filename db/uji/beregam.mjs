@@ -28,6 +28,23 @@ const API_KEY = env.BEREGAM_API_KEY;
 const HMAC = env.BEREGAM_WEBHOOK_HMAC;
 const NOMOR = "6281299887766@c.us";
 
+// Tanggal uji harus selalu valid. Nilai tetap pernah membuat seluruh bagian
+// formulir gagal begitu kalender melewati tanggal tersebut.
+const besokWib = new Date(Date.now() + 24 * 60 * 60 * 1000);
+const bagianBesok = Object.fromEntries(
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .formatToParts(besokWib)
+    .filter((p) => p.type !== "literal")
+    .map((p) => [p.type, p.value])
+);
+const tanggalUjiIso = `${bagianBesok.year}-${bagianBesok.month}-${bagianBesok.day}`;
+const tanggalUjiTampilan = `${bagianBesok.day}-${bagianBesok.month}-${bagianBesok.year}`;
+
 let gagal = 0;
 function lapor(nama, lulus, ket = "") {
   console.log(`  ${lulus ? "LULUS" : "GAGAL"}  ${nama}${ket ? `  (${ket})` : ""}`);
@@ -479,6 +496,21 @@ async function main() {
         `WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`
     ) === "Pilih penilaian"
   );
+  lapor(
+    "  deskripsi penilaian tidak menggandakan pilihan skor",
+    sql(
+      `SELECT JSON_UNQUOTE(JSON_EXTRACT(payload, '$.list.description')) = ` +
+        `JSON_UNQUOTE(JSON_EXTRACT(payload, '$.header')) FROM pesta.beregam_outbox ` +
+        `WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`
+    ) === "1"
+  );
+  lapor(
+    "  fallback teks tetap memuat pilihan skor lengkap",
+    sql(
+      `SELECT JSON_UNQUOTE(JSON_EXTRACT(payload, '$.text')) FROM pesta.beregam_outbox ` +
+        `WHERE contact_id=${kontakId} ORDER BY id DESC LIMIT 1;`
+    ).includes("5. Sangat puas")
+  );
 
   await webhook(pesanWa("4"));
   await jeda(500);
@@ -606,7 +638,7 @@ async function main() {
     "Topik: PDRB dan Inflasi\n" +
     "Kebutuhan: Saya ingin berkonsultasi soal data PDRB triwulanan.\n" +
     "Terutama sektor pertanian tahun 2023.\n" +
-    "Tanggal: 01-09-2026\n" +
+    `Tanggal: ${tanggalUjiTampilan}\n` +
     "Jam: 09:00\n" +
     "Pendampingan: tidak"
   ));
@@ -621,7 +653,7 @@ async function main() {
   );
   lapor(
     "  tanggal & jam terbaca dari format DD-MM-YYYY",
-    sql(`SELECT CONCAT(tanggal,'|',jam) FROM pesta.vidcon_requests WHERE id=${vidId};`) === "2026-09-01|09:00"
+    sql(`SELECT CONCAT(tanggal,'|',jam) FROM pesta.vidcon_requests WHERE id=${vidId};`) === `${tanggalUjiIso}|09:00`
   );
   lapor(
     "  uraian multi-baris TIDAK terpotong di baris pertama",

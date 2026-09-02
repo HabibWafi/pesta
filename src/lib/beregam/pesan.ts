@@ -61,6 +61,21 @@ export const DEFINISI_PESAN = {
       "Ada yang bisa dibantu lagi? Ketik *menu* untuk pilihan lainnya, atau " +
       "*petugas* kalau ingin ngobrol langsung dengan staf kami. 😊",
   },
+  interaktif_menu_judul: {
+    label: "Daftar interaktif - judul menu utama",
+    bantuan: "Judul pendek di bagian atas kartu daftar WhatsApp.",
+    bawaan: "Menu Layanan Beregam",
+  },
+  interaktif_menu_tombol: {
+    label: "Daftar interaktif - tombol menu utama",
+    bantuan: "Teks pendek pada tombol yang membuka pilihan layanan.",
+    bawaan: "Pilih layanan",
+  },
+  interaktif_menu_bagian: {
+    label: "Daftar interaktif - nama kelompok layanan",
+    bantuan: "Judul kelompok pilihan setelah tombol daftar dibuka.",
+    bawaan: "Layanan tersedia",
+  },
   tidak_paham: {
     label: "Pesan tidak dipahami",
     bawaan:
@@ -125,6 +140,26 @@ export const DEFINISI_PESAN = {
       "Ketik *lewati* bila sedang tidak sempat.\n\n" +
       "📋 Selain itu, kami juga mengundang Anda mengisi Survei Kebutuhan Data (SKD) resmi BPS di:\n" +
       "https://skd.bps.go.id/skd/s/1605",
+  },
+  interaktif_penilaian_judul: {
+    label: "Daftar interaktif - judul penilaian",
+    bantuan: "Judul pendek di bagian atas kartu penilaian WhatsApp.",
+    bawaan: "Penilaian Layanan Beregam",
+  },
+  interaktif_penilaian_tombol: {
+    label: "Daftar interaktif - tombol penilaian",
+    bantuan: "Teks pendek pada tombol yang membuka pilihan nilai 1-5.",
+    bawaan: "Pilih penilaian",
+  },
+  interaktif_penilaian_bagian: {
+    label: "Daftar interaktif - nama kelompok penilaian",
+    bantuan: "Judul kelompok pilihan nilai setelah tombol daftar dibuka.",
+    bawaan: "Tingkat kepuasan",
+  },
+  interaktif_penilaian_footer: {
+    label: "Daftar interaktif - catatan bawah penilaian",
+    bantuan: "Teks singkat paling bawah pada kartu penilaian WhatsApp.",
+    bawaan: "Survei layanan BPS Kabupaten Musi Rawas",
   },
   penilaian_terima: {
     label: "Penilaian diterima, tawarkan masukan tertulis",

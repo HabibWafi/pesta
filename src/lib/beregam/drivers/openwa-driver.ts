@@ -62,14 +62,14 @@ export class OpenWaDriver implements BeregamGateway {
     });
 
     // Dokumentasi WAHA menyebut List Message dapat sewaktu-waktu gagal.
-    // Karena itu deskripsinya juga memuat menu teks lengkap. Bila tombol
-    // daftar tidak dirender aplikasi WhatsApp tertentu, warga tetap dapat
-    // membalas angka persis seperti mekanisme lama.
+    // `teks` tetap memuat pilihan lengkap sebagai fallback worker. Deskripsi
+    // interaktif boleh dipisahkan supaya pilihan yang sudah tersedia di dalam
+    // tombol daftar tidak tercetak dua kali pada kartu pesan WhatsApp.
     const list =
       rows.length > 0
         ? {
             title: opts.interactive?.title ?? "Menu Layanan Beregam",
-            description: teks,
+            description: opts.interactive?.description ?? teks,
             footer: opts.interactive?.footer ?? "BPS Kabupaten Musi Rawas",
             button: opts.interactive?.button ?? "Pilih layanan",
             sections: [

@@ -322,11 +322,28 @@ export class BeregamService {
       ? `${await ambilPesan("sapaan")}\n\n${await ambilPesan("menu_intro")}`
       : await ambilPesan("menu_intro_ulang");
 
-    await this.gateway.queueMenu(contact.id, contact.waId, header, [
-      ...baris,
-      "",
-      await ambilPesan("menu_footer"),
-    ], { source: "bot" });
+    const [footer, judulInteraktif, tombolInteraktif, bagianInteraktif] =
+      await Promise.all([
+        ambilPesan("menu_footer"),
+        ambilPesan("interaktif_menu_judul"),
+        ambilPesan("interaktif_menu_tombol"),
+        ambilPesan("interaktif_menu_bagian"),
+      ]);
+
+    await this.gateway.queueMenu(
+      contact.id,
+      contact.waId,
+      header,
+      [...baris, "", footer],
+      {
+        source: "bot",
+        interactive: {
+          title: judulInteraktif,
+          button: tombolInteraktif,
+          sectionTitle: bagianInteraktif,
+        },
+      }
+    );
 
     const sekarang = new Date();
     await db
@@ -744,10 +761,18 @@ export class BeregamService {
       })
       .where(eq(beregamSessions.id, sesi.id));
 
+    const [pesanPenilaian, judul, tombol, bagian, footer] = await Promise.all([
+      ambilPesan("penilaian_minta"),
+      ambilPesan("interaktif_penilaian_judul"),
+      ambilPesan("interaktif_penilaian_tombol"),
+      ambilPesan("interaktif_penilaian_bagian"),
+      ambilPesan("interaktif_penilaian_footer"),
+    ]);
+
     await this.gateway.queueMenu(
       contact.id,
       contact.waId,
-      await ambilPesan("penilaian_minta"),
+      pesanPenilaian,
       [
         "5. Sangat puas",
         "4. Puas",
@@ -760,10 +785,14 @@ export class BeregamService {
       {
         source: "bot",
         interactive: {
-          title: "Penilaian Layanan Beregam",
-          button: "Pilih penilaian",
-          sectionTitle: "Tingkat kepuasan",
-          footer: "Survei layanan BPS Kabupaten Musi Rawas",
+          title: judul,
+          button: tombol,
+          sectionTitle: bagian,
+          footer,
+          // Pilihan skor berada di balik tombol daftar. Naskah ini sengaja
+          // dipakai langsung agar skala 1-5 tidak tercetak dua kali seperti
+          // pada implementasi awal List Message.
+          description: pesanPenilaian,
         },
       }
     );
