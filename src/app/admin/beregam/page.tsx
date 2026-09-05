@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   Bot,
@@ -83,6 +83,46 @@ function waktuSingkat(iso: string | null): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * WhatsApp menerima List Message yang interaktif, sementara riwayat internal
+ * menyimpan teks pilihan lengkap sebagai jalur cadangan bila List Message
+ * gagal dirender. Untuk penilaian, skala 1-5 sudah ada di naskah utama;
+ * sembunyikan SALINAN cadangannya agar inbox tidak memberi kesan pesan dobel.
+ */
+function teksInbox(pesan: PesanThread): string | null {
+  if (!pesan.body || pesan.type !== "menu") return pesan.body;
+
+  const cadanganPenilaian =
+    "\n\n5. Sangat puas\n4. Puas\n3. Cukup\n2. Kurang puas\n1. Tidak puas\n\nKetik lewati bila sedang tidak sempat.";
+
+  if (
+    pesan.body.includes("Balas dengan *angka 1 sampai 5*") &&
+    pesan.body.endsWith(cadanganPenilaian)
+  ) {
+    return pesan.body.slice(0, -cadanganPenilaian.length);
+  }
+
+  return pesan.body;
+}
+
+/** Menampilkan penanda dasar WhatsApp tanpa memasukkan HTML mentah ke inbox. */
+function formatTeksWhatsApp(teks: string): ReactNode[] {
+  return teks.split(/(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|https?:\/\/[^\s]+)/g).map((bagian, i) => {
+    if (!bagian) return null;
+    if (/^https?:\/\//.test(bagian)) {
+      return (
+        <a key={i} href={bagian} target="_blank" rel="noreferrer" className="underline break-all opacity-95">
+          {bagian}
+        </a>
+      );
+    }
+    if (bagian.startsWith("*") && bagian.endsWith("*")) return <strong key={i}>{bagian.slice(1, -1)}</strong>;
+    if (bagian.startsWith("_") && bagian.endsWith("_")) return <em key={i}>{bagian.slice(1, -1)}</em>;
+    if (bagian.startsWith("~") && bagian.endsWith("~")) return <s key={i}>{bagian.slice(1, -1)}</s>;
+    return <span key={i}>{bagian}</span>;
+  });
 }
 
 export default function AdminBeregamPage() {
@@ -921,9 +961,16 @@ function DetailPercakapan({ id, onClose, onBerubah }: { id: number; onClose: () 
                   }`}
                 >
                   {p.type !== "text" && p.type !== "chat" && (
-                    <div className="text-[11px] opacity-70 mb-1">[{p.type}]</div>
+                    <div className="text-[11px] opacity-70 mb-1 flex items-center gap-1.5">
+                      <MessageSquareText className="w-3 h-3" />
+                      {p.type === "menu" ? "Daftar pilihan interaktif" : `[${p.type}]`}
+                    </div>
                   )}
-                  {p.body || <span className="italic opacity-60">(tanpa teks)</span>}
+                  {teksInbox(p) ? (
+                    formatTeksWhatsApp(teksInbox(p)!)
+                  ) : (
+                    <span className="italic opacity-60">(tanpa teks)</span>
+                  )}
                   <div className="text-[10px] opacity-60 mt-1 flex items-center gap-1.5">
                     {waktuSingkat(p.createdAt)}
                     {p.direction === "out" && p.source && (
