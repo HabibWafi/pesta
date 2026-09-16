@@ -353,7 +353,124 @@ export const beregamKbHits = mysqlTable("beregam_kb_hits", {
 });
 
 // ---------------------------------------------------------------------------
-// 10. Indikator statistik terverifikasi (Fase 3)
+// 10. Katalog dan versi dataset statistik (Fase 3)
+//
+// Metadata dipisahkan dari observasi supaya satu dataset dapat mempunyai
+// banyak periode, wilayah, dan dimensi tanpa mengulang judul/sumber.
+// ---------------------------------------------------------------------------
+export const beregamDatasets = mysqlTable(
+  "beregam_datasets",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    kode: varchar("kode", { length: 40 }).notNull(),
+    slug: varchar("slug", { length: 120 }).notNull(),
+    nama: varchar("nama", { length: 200 }).notNull(),
+    tema: varchar("tema", { length: 60 }).notNull(),
+    definisi: text("definisi"),
+    satuan: varchar("satuan", { length: 40 }),
+    sourceType: mysqlEnum("source_type", ["dynamic", "simdasi", "manual"])
+      .default("dynamic")
+      .notNull(),
+    /** ID variabel/id tabel resmi. Maksimal 191 agar aman di MariaDB lama. */
+    sourceRef: varchar("source_ref", { length: 191 }),
+    sourceConfig: json("source_config").$type<Record<string, unknown>>(),
+    sourceUrl: varchar("source_url", { length: 300 }),
+    defaultView: mysqlEnum("default_view", [
+      "number",
+      "line",
+      "bar",
+      "stacked",
+      "composition",
+      "map",
+    ])
+      .default("line")
+      .notNull(),
+    isFeatured: boolean("is_featured").default(false).notNull(),
+    featuredOrder: int("featured_order").default(0).notNull(),
+    highlightTitle: varchar("highlight_title", { length: 160 }),
+    /** Narasi non-angka. Angka selalu berasal dari observasi. */
+    highlightNote: text("highlight_note"),
+    isActive: boolean("is_active").default(true).notNull(),
+    syncEnabled: boolean("sync_enabled").default(false).notNull(),
+    createdAt: dibuat(),
+    updatedAt: diubah(),
+  },
+  (t) => [
+    unique("beregam_datasets_kode_key").on(t.kode),
+    unique("beregam_datasets_slug_key").on(t.slug),
+    index("beregam_datasets_tema_idx").on(t.tema, t.isActive),
+    index("beregam_datasets_featured_idx").on(t.isFeatured, t.featuredOrder),
+  ]
+);
+
+export const beregamDatasetVersions = mysqlTable(
+  "beregam_dataset_versions",
+  {
+    id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+    datasetId: int("dataset_id")
+      .notNull()
+      .references(() => beregamDatasets.id, { onDelete: "cascade" }),
+    status: mysqlEnum("status", ["draft", "published", "archived", "rejected"])
+      .default("draft")
+      .notNull(),
+    contentHash: varchar("content_hash", { length: 64 }).notNull(),
+    sourceUpdatedAt: waktu("source_updated_at"),
+    fetchedAt: waktu("fetched_at").$defaultFn(() => new Date()).notNull(),
+    reviewedAt: waktu("reviewed_at"),
+    reviewedBy: int("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    reviewNote: text("review_note"),
+    summary: json("summary").$type<{
+      observations: number;
+      added: number;
+      changed: number;
+      removed: number;
+    }>(),
+    createdAt: dibuat(),
+  },
+  (t) => [
+    unique("beregam_dataset_versions_hash_key").on(t.datasetId, t.contentHash),
+    index("beregam_dataset_versions_status_idx").on(t.datasetId, t.status, t.createdAt),
+  ]
+);
+
+export const beregamSyncRuns = mysqlTable(
+  "beregam_sync_runs",
+  {
+    id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+    trigger: mysqlEnum("trigger", ["heartbeat", "admin"]).notNull(),
+    status: mysqlEnum("status", ["running", "done", "partial", "failed"])
+      .default("running")
+      .notNull(),
+    requestedBy: int("requested_by").references(() => users.id, { onDelete: "set null" }),
+    datasetsChecked: int("datasets_checked").default(0).notNull(),
+    draftsCreated: int("drafts_created").default(0).notNull(),
+    error: text("error"),
+    startedAt: waktu("started_at").$defaultFn(() => new Date()).notNull(),
+    finishedAt: waktu("finished_at"),
+    createdAt: dibuat(),
+  },
+  (t) => [index("beregam_sync_runs_started_idx").on(t.startedAt, t.status)]
+);
+
+/** Jejak perubahan tata kelola dataset oleh admin. */
+export const beregamDataAudit = mysqlTable(
+  "beregam_data_audit",
+  {
+    id: bigint("id", { mode: "number" }).autoincrement().primaryKey(),
+    datasetId: int("dataset_id").references(() => beregamDatasets.id, { onDelete: "set null" }),
+    versionId: bigint("version_id", { mode: "number" }).references(() => beregamDatasetVersions.id, { onDelete: "set null" }),
+    action: varchar("action", { length: 40 }).notNull(),
+    actorId: int("actor_id").references(() => users.id, { onDelete: "set null" }),
+    before: json("before").$type<Record<string, unknown>>(),
+    after: json("after").$type<Record<string, unknown>>(),
+    note: text("note"),
+    createdAt: dibuat(),
+  },
+  (t) => [index("beregam_data_audit_dataset_idx").on(t.datasetId, t.createdAt)]
+);
+
+// ---------------------------------------------------------------------------
+// 11. Indikator statistik terverifikasi (Fase 3)
 //
 // SATU-SATUNYA sumber angka yang boleh dikutip bot.
 // Isinya data terkurasi dan terverifikasi, bukan hasil scraping mentah.
@@ -362,16 +479,32 @@ export const beregamIndikator = mysqlTable(
   "beregam_indikator",
   {
     id: int("id").autoincrement().primaryKey(),
+    datasetId: int("dataset_id")
+      .notNull()
+      .references(() => beregamDatasets.id, { onDelete: "cascade" }),
+    versionId: bigint("version_id", { mode: "number" })
+      .notNull()
+      .references(() => beregamDatasetVersions.id, { onDelete: "cascade" }),
     kode: varchar("kode", { length: 40 }).notNull(),
     nama: varchar("nama", { length: 200 }).notNull(),
     satuan: varchar("satuan", { length: 40 }),
     wilayahKode: varchar("wilayah_kode", { length: 20 }).notNull(),
     wilayahNama: varchar("wilayah_nama", { length: 100 }),
+    wilayahLevel: mysqlEnum("wilayah_level", ["kabupaten", "kecamatan", "desa"])
+      .default("kabupaten")
+      .notNull(),
     tahun: smallint("tahun").notNull(),
     periode: varchar("periode", { length: 20 }),
+    periodeKode: varchar("periode_kode", { length: 40 }).notNull(),
+    dimensi: json("dimensi").$type<Record<string, string>>(),
+    /** Hash JSON dimensi yang sudah diurutkan, aman untuk unique index. */
+    dimensiHash: varchar("dimensi_hash", { length: 64 }).notNull(),
     nilai: decimal("nilai", { precision: 20, scale: 4 }).notNull(),
     /** Wajib terisi. Setiap angka yang keluar bot menyebutkan sumbernya. */
     sumberPublikasi: varchar("sumber_publikasi", { length: 200 }).notNull(),
+    sourceRef: varchar("source_ref", { length: 191 }),
+    sourceUrl: varchar("source_url", { length: 300 }),
+    sourceUpdatedAt: waktu("source_updated_at"),
     catatan: text("catatan"),
     /**
      * Baris tanpa verifikasi TIDAK BOLEH dikutip bot.
@@ -385,15 +518,21 @@ export const beregamIndikator = mysqlTable(
     updatedAt: diubah(),
   },
   (t) => [
-    unique("beregam_indikator_key").on(t.kode, t.wilayahKode, t.tahun, t.periode),
-    index("beregam_indikator_kode_idx").on(t.kode),
-    index("beregam_indikator_wilayah_idx").on(t.wilayahKode),
-    index("beregam_indikator_tahun_idx").on(t.tahun),
+    unique("beregam_indikator_observasi_key").on(
+      t.datasetId,
+      t.versionId,
+      t.wilayahKode,
+      t.periodeKode,
+      t.dimensiHash
+    ),
+    index("beregam_indikator_kode_idx").on(t.kode, t.versionId),
+    index("beregam_indikator_wilayah_idx").on(t.wilayahKode, t.wilayahLevel),
+    index("beregam_indikator_tahun_idx").on(t.tahun, t.periodeKode),
   ]
 );
 
 // ---------------------------------------------------------------------------
-// 11. Antrean pekerjaan AI (Fase 2/4)
+// 12. Antrean pekerjaan AI (Fase 2/4)
 //
 // Dibuat sejak sekarang meski Fase 2 belum memakai LLM: kontraknya sudah
 // benar sejak awal, sehingga naik ke perangkat yang lebih baik nanti tidak
@@ -576,6 +715,10 @@ export type BeregamHandover = InferSelectModel<typeof beregamHandovers>;
 export type BeregamFaq = InferSelectModel<typeof beregamFaq>;
 export type BeregamHealth = InferSelectModel<typeof beregamHealth>;
 export type BeregamKb = InferSelectModel<typeof beregamKb>;
+export type BeregamDataset = InferSelectModel<typeof beregamDatasets>;
+export type BeregamDatasetVersion = InferSelectModel<typeof beregamDatasetVersions>;
+export type BeregamSyncRun = InferSelectModel<typeof beregamSyncRuns>;
+export type BeregamDataAudit = InferSelectModel<typeof beregamDataAudit>;
 export type BeregamIndikator = InferSelectModel<typeof beregamIndikator>;
 export type BeregamAiJob = InferSelectModel<typeof beregamAiJobs>;
 export type BeregamAlert = InferSelectModel<typeof beregamAlerts>;

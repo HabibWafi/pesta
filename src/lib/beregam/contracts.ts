@@ -219,6 +219,47 @@ export type HeartbeatResponse = z.infer<typeof heartbeatResponseSchema>;
 // AI worker (Fase 2)
 // ===========================================================================
 
+/** Permintaan statistik yang boleh dibentuk model. Model tidak pernah mengirim SQL. */
+export const indicatorQuerySchema = z.object({
+  dataset: z.string().trim().min(1).max(160),
+  wilayah: z.object({
+    level: z.enum(["kabupaten", "kecamatan", "desa"]).optional(),
+    codes: z.array(z.string().trim().min(1).max(30)).max(100).default([]),
+  }).optional(),
+  periode: z.object({
+    codes: z.array(z.string().trim().min(1).max(40)).max(100).default([]),
+  }).optional(),
+  dimensi: z.record(z.string().max(80), z.string().max(160)).default({}),
+  operation: z.enum(["lookup", "compare", "trend", "rank"]),
+  limit: z.number().int().min(1).max(100).default(50),
+});
+
+export type IndicatorQuery = z.infer<typeof indicatorQuerySchema>;
+
+/** Fakta lengkap tetap berada di kode PESTA dan tidak diberikan mentah ke model. */
+export const verifiedFactSchema = z.object({
+  token: z.string().regex(/^\[\[FAKTA_[1-9][0-9]*\]\]$/),
+  nilai: z.string(),
+  satuan: z.string().nullable(),
+  periode: z.string(),
+  wilayah: z.string(),
+  judulSumber: z.string(),
+  urlSumber: z.string().url().nullable(),
+});
+
+export type VerifiedFact = z.infer<typeof verifiedFactSchema>;
+
+export const indicatorQueryResponseSchema = z.object({
+  ok: z.literal(true),
+  query: indicatorQuerySchema,
+  facts: z.array(verifiedFactSchema),
+  /** Hanya token dan label bebas digit ini yang boleh masuk ke prompt narasi. */
+  narrativeContext: z.array(z.object({ token: z.string(), label: z.string() })),
+  limitation: z.string().nullable(),
+});
+
+export type IndicatorQueryResponse = z.infer<typeof indicatorQueryResponseSchema>;
+
 export const aiJobItemSchema = z.object({
   id: z.number().int().positive(),
   question: z.string(),

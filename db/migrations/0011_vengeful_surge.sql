@@ -1,0 +1,2 @@
+-- Checkpoint snapshot Drizzle setelah migration 0010 yang dikurasi manual.
+-- Tidak ada SQL tambahan: seluruh perubahan skema sudah ada di 0010.
