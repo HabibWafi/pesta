@@ -23,7 +23,8 @@ import {
   BarChart3,
   ShieldCheck,
   Bot,
-  Database
+  Database,
+  ChartNoAxesCombined
 } from "lucide-react";
 import { toast } from "sonner";
 import LonengNotifikasi from "@/components/admin/LonengNotifikasi";
@@ -122,6 +123,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Pengaduan Publik", href: "/admin/pengaduan", icon: ShieldAlert },
     { name: "Pesan Kontak PST", href: "/admin/contact", icon: Mail },
     { name: "Statistik Pengunjung", href: "/admin/analytics", icon: BarChart3 },
+    { name: "Kelola Dashboard Data", href: "/admin/data", icon: ChartNoAxesCombined },
     { name: "Kelola Konten", href: "/admin/konten", icon: Settings2 },
     { name: "Bot WhatsApp Beregam", href: "/admin/beregam", icon: Bot },
     { name: "Akun Administrator", href: "/admin/users", icon: ShieldCheck },

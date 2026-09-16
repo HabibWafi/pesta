@@ -70,6 +70,11 @@ hPanel → **Website** → **Node.js** → aplikasi PESTA → **Environment Vari
 | `NODE_ENV` | `production` | |
 | `APP_TZ` | `Asia/Jakarta` | |
 | `GOOGLE_MAPS_EMBED_KEY` | *(boleh kosong)* | Kosong pun peta Google tetap tampil |
+| `BPS_WEBAPI_KEY` | kunci dari portal developer BPS | Wajib untuk sinkronisasi Dashboard Data; jangan simpan di repositori |
+
+Kunci Web API BPS didaftarkan satu kali melalui portal developer BPS. Tanpa
+kunci ini dashboard tetap menayangkan versi yang sudah diverifikasi, tetapi
+sinkronisasi baru akan berhenti dengan pesan konfigurasi yang jelas.
 
 **Variabel Beregam belum perlu diisi sekarang.** Selama `BEREGAM_API_KEY` dan
 `BEREGAM_WEBHOOK_HMAC` kosong, seluruh route `/api/beregam/*` membalas **503
@@ -114,6 +119,11 @@ Migration yang dijalankan:
 | `0004_analitik_per_halaman` | Tabel `analytics_path_daily` |
 | `0005_beregam_fondasi` | 14 tabel berprefiks `beregam_` untuk bot WhatsApp |
 | `0006_beregam_pesan_sistem` | Tabel `beregam_settings` - naskah pesan bot yang bisa diedit admin |
+| `0007_beregam_penilaian` | Penilaian layanan dan jejak sesi |
+| `0008_permintaan_data` | Permintaan data publik |
+| `0009_permintaan_data_lampiran` | Metadata lampiran permintaan data |
+| `0010_dashboard_data` | Katalog, versi, audit, sinkronisasi, migrasi indikator lama, dan 23 indikator awal |
+| `0011_vengeful_surge` | Checkpoint skema Drizzle; tidak menjalankan SQL tambahan |
 
 > Migration **tidak pernah** dijalankan lewat CLI di server, dan **jangan**
 > membuat endpoint migration sekali-pakai di aplikasi. Endpoint semacam itu
@@ -126,10 +136,10 @@ Verifikasi setelah selesai:
 SHOW TABLES;
 ```
 
-Harus ada **25 tabel**: 10 tabel inti - `users`, `vidcon_requests`,
+Harus ada **31 tabel**: 11 tabel inti - `users`, `vidcon_requests`,
 `pengaduans`, `contacts`, `site_settings`, `testimonials`, `faqs`,
-`analytics_events`, `analytics_daily`, `analytics_path_daily` - ditambah
-15 tabel berprefiks `beregam_`.
+`analytics_events`, `analytics_daily`, `analytics_path_daily`,
+`permintaan_data` - ditambah 20 tabel berprefiks `beregam_`.
 
 > **Nilai bawaan waktu sengaja ditulis tanpa tanda kurung.** drizzle-kit
 > menghasilkan `DEFAULT (CURRENT_TIMESTAMP(3))`, bentuk "nilai bawaan berupa

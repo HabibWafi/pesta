@@ -29,7 +29,10 @@ function selKeTeks(nilai: NilaiSel): string {
 function kutip(teks: string): string {
   // Awalan yang bisa ditafsirkan Excel sebagai rumus dilucuti. Tanpa ini,
   // isian warga yang diawali "=" akan dieksekusi saat berkas dibuka.
-  const aman = /^[=+\-@\t\r]/.test(teks) ? `'${teks}` : teks;
+  // Angka negatif murni tetap dibiarkan sebagai angka, bukan diubah menjadi
+  // teks, karena nilai statistik dashboard dapat sah bernilai negatif.
+  const angkaMurni = /^-?\d+(?:[.,]\d+)?$/.test(teks);
+  const aman = !angkaMurni && /^[=+\-@\t\r]/.test(teks) ? `'${teks}` : teks;
   return /[";\n\r]/.test(aman) ? `"${aman.replace(/"/g, '""')}"` : aman;
 }
 

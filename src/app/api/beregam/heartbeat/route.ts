@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { beregamHealth } from "@/lib/beregam/db/schema";
@@ -6,6 +6,7 @@ import { otorisasiWorker } from "@/lib/beregam/auth";
 import { heartbeatRequestSchema } from "@/lib/beregam/contracts";
 import { ambilHealth, perbaruiSewa } from "@/lib/beregam/db/queries";
 import { runMaintenanceBilaPerlu } from "@/lib/beregam/services/maintenance";
+import { sinkronisasiHarianBilaPerlu } from "@/lib/dashboard-data/sync";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -42,6 +43,19 @@ export async function POST(req: Request) {
     const holdsLease = await perbaruiSewa(data.workerId);
     const maintenanceRan = await runMaintenanceBilaPerlu();
     const health = await ambilHealth();
+
+    // Sinkronisasi statistik boleh memerlukan beberapa panggilan jaringan.
+    // Jalankan setelah respons heartbeat dikirim agar sewa worker dan ACK
+    // tidak tertahan oleh Web API BPS.
+    if (holdsLease) {
+      after(async () => {
+        try {
+          await sinkronisasiHarianBilaPerlu();
+        } catch (error) {
+          console.error("[dashboard-data] sinkronisasi harian gagal:", error);
+        }
+      });
+    }
 
     return NextResponse.json({
       ok: true,

@@ -21,7 +21,7 @@
 
 process.env.BPS_WEBAPI_KEY = "KUNCI-UJI";
 
-const { ambilPublikasiLangsung, ambilTabelLangsung } = await import(
+const { ambilPublikasiLangsung, ambilTabelLangsung, ambilDetailTabelLangsung, uraiDataDinamis, uraiDataSimdasi } = await import(
   "../../src/lib/beregam/bps-api.js"
 );
 
@@ -49,7 +49,7 @@ tiruJawaban({
   status: "OK",
   "data-availability": "available",
   data: [
-    { page: 1, pages: 42, per_page: 10, count: 10, total: 414 },
+    { page: 1, pages: 1, per_page: 10, count: 2, total: 2 },
     [
       {
         pub_id: "abc123",
@@ -90,6 +90,38 @@ lapor("tabel statistik terbaca", Array.isArray(tab) && tab.length === 2, `${tab?
 lapor("  judul dan subjek terbaca", tab?.[0].judul === "Jumlah Penduduk (Jiwa)" && tab?.[0].subjek === "Kependudukan");
 lapor("  tanggal pembaruan diterjemahkan", tab?.[0].diperbarui === "20 Februari 2026");
 
+tiruJawaban({ status: "OK", data: { table_id: 2, title: "Kepadatan Penduduk", updt_date: "2025-03-20", excel: "https://webapi.bps.go.id/download/contoh.xlsx", size: "12 KB", table: "<table>tidak boleh diparsing</table>" } });
+const detailTabel = await ambilDetailTabelLangsung("2");
+lapor("detail tabel statis hanya menghasilkan metadata", detailTabel?.judul === "Kepadatan Penduduk" && !("table" in detailTabel));
+lapor("  tautan unduh resmi dipertahankan", detailTabel?.tautanUnduh?.endsWith("contoh.xlsx") === true);
+
+const dynamic = uraiDataDinamis({
+  status: "OK",
+  var: [{ val: 10, label: "Jumlah Penduduk", unit: "Jiwa" }],
+  turvar: [{ val: 0, label: "Total" }],
+  vervar: [{ val: 1605, label: "Kabupaten Musi Rawas" }],
+  tahun: [{ val: 2024, label: "2024" }],
+  turtahun: [{ val: 0, label: "Tahun" }],
+  datacontent: { "160510020240": "418520,50" },
+}, "10", "kabupaten");
+lapor("data dinamis multidimensi terbaca", dynamic?.observations.length === 1);
+lapor("  desimal dipertahankan sebagai string", dynamic?.observations[0]?.nilai === "418520.50");
+
+const simdasi = uraiDataSimdasi({
+  data: { rows: [{ tahun: "2025", kode_wilayah: "1605010", nama_wilayah: "STL Ulu Terawas", kategori: "Padi", nilai: "12,75" }] },
+}, { wilayah: "1605000", tahun: 2025, idTabel: "contoh", wilayahLevel: "kecamatan" });
+lapor("SIMDASI bertingkat terbaca", simdasi?.observations[0]?.wilayahKode === "1605010");
+lapor("  dimensi SIMDASI dipertahankan", simdasi?.observations[0]?.dimensi.kategori === "Padi");
+
+let halaman = 0;
+globalThis.fetch = (async (input) => {
+  halaman += 1;
+  const isSecond = String(input).includes("/page/2/");
+  return new Response(JSON.stringify({ status: "OK", data: [{ page: isSecond ? 2 : 1, pages: 2 }, [{ title: isSecond ? "Halaman Dua" : "Halaman Satu" }]] }));
+}) as typeof fetch;
+const paginated = await ambilPublikasiLangsung();
+lapor("pagination diikuti sampai selesai", paginated?.length === 2 && halaman === 2);
+
 // === B. Semua bentuk gagal -> null (bot memakai jawaban cadangan) ==========
 //
 // Tidak satu pun boleh melempar galat. Galat yang lolos akan membuat bot
@@ -116,6 +148,13 @@ globalThis.fetch = (async () => {
   throw new Error("getaddrinfo ENOTFOUND webapi.bps.go.id");
 }) as typeof fetch;
 lapor("jaringan putus -> null", (await ambilPublikasiLangsung()) === null);
+
+globalThis.fetch = (async () => {
+  const error = new Error("dibatalkan");
+  error.name = "AbortError";
+  throw error;
+}) as typeof fetch;
+lapor("timeout -> null", (await ambilPublikasiLangsung()) === null);
 
 // === C. Tanpa kunci sama sekali ============================================
 console.log("\nC. TANPA KUNCI");
