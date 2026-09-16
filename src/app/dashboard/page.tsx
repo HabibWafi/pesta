@@ -4,6 +4,11 @@ import { keadaanFitur, metadataFitur, PitaPratayang } from "@/components/Prataya
 import { getDashboardCatalog } from "@/lib/dashboard-data/queries";
 import DashboardClient, { type DashboardInitialSelection } from "./DashboardClient";
 
+// Wajib dinamis karena keputusan tayang/pratayang bergantung pada nilai
+// database dan cookie admin. Respons ini tidak boleh menjadi 404 bersama
+// yang tersimpan lalu disajikan kembali kepada petugas atau warga.
+export const dynamic = "force-dynamic";
+
 /**
  * Saklar `tampilan.dashboard` memungkinkan verifikasi internal dan rollback
  * cepat tanpa menghapus data atau riwayat publikasi.
@@ -23,7 +28,19 @@ export default async function DashboardPage({
 }) {
   const keadaan = await keadaanFitur("tampilan.dashboard");
   if (keadaan === "tertutup") notFound();
-  const [datasets, rawParams] = await Promise.all([getDashboardCatalog(), searchParams]);
+  const [hasilKatalog, rawParams] = await Promise.all([
+    getDashboardCatalog()
+      .then((datasets) => ({ datasets, gagal: false }))
+      .catch((error: unknown) => {
+        // Halaman pratayang tetap harus bisa diperiksa walau sumber data
+        // sementara bermasalah atau migration belum selesai dijalankan.
+        // Jangan mengarang data pengganti; tampilkan keadaan kosong yang jelas.
+        console.error("[dashboard-data] katalog halaman gagal dimuat:", error);
+        return { datasets: [], gagal: true };
+      }),
+    searchParams,
+  ]);
+  const datasets = hasilKatalog.datasets;
   const dimensions = Object.fromEntries(Object.entries(rawParams)
     .filter(([key, value]) => key.startsWith("dim.") && key.length > 4 && key.length <= 84 && single(value, 160))
     .map(([key, value]) => [key.slice(4), single(value, 160)!]));
@@ -43,7 +60,11 @@ export default async function DashboardPage({
   return (
     <>
       {keadaan === "pratayang" && <PitaPratayang nama="Dashboard Data" />}
-      <DashboardClient initialDatasets={datasets} initialSelection={initialSelection} />
+      <DashboardClient
+        initialDatasets={datasets}
+        initialSelection={initialSelection}
+        initialLoadError={hasilKatalog.gagal}
+      />
     </>
   );
 }

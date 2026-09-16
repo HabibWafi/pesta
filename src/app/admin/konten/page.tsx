@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   X,
   Star,
+  ExternalLink,
 } from "lucide-react";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import type { Faq, Testimonial } from "@/lib/db/schema";
@@ -42,6 +43,7 @@ export default function AdminKontenPage() {
   const [tab, setTab] = useState<Tab>("pengaturan");
   const [loading, setLoading] = useState(true);
   const [menyimpan, setMenyimpan] = useState(false);
+  const [menyimpanSaklar, setMenyimpanSaklar] = useState<keyof Pengaturan | null>(null);
 
   const [pengaturan, setPengaturan] = useState<Pengaturan | null>(null);
   const [definisi, setDefinisi] = useState<Record<string, DefinisiSetting>>({});
@@ -111,6 +113,48 @@ export default function AdminKontenPage() {
       });
     } finally {
       setMenyimpan(false);
+    }
+  };
+
+  /**
+   * Saklar langsung disimpan saat diklik.
+   *
+   * Sebelumnya warna saklar berubah tetapi nilainya belum masuk database
+   * sampai tombol Simpan Pengaturan di bagian paling bawah ditekan. Perilaku
+   * itu mudah disangka sudah aktif, terutama untuk Dashboard yang hasilnya
+   * diperiksa di tab lain. Endpoint menerima perubahan parsial agar edit teks
+   * lain yang belum selesai tidak ikut tersimpan tanpa sengaja.
+   */
+  const simpanSaklar = async (kunci: keyof Pengaturan, nilaiLama: string) => {
+    if (!pengaturan || menyimpanSaklar) return;
+
+    const nilaiBaru = nilaiLama === "1" ? "0" : "1";
+    setPengaturan((sekarang) =>
+      sekarang ? { ...sekarang, [kunci]: nilaiBaru } : sekarang
+    );
+    setMenyimpanSaklar(kunci);
+
+    try {
+      const res = await fetch("/api/admin/konten", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pengaturan: { [kunci]: nilaiBaru } }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message);
+
+      toast.success(nilaiBaru === "1" ? "Fitur diaktifkan" : "Fitur dinonaktifkan", {
+        description: `${definisi[kunci]?.label ?? "Pengaturan"} sudah tersimpan dan langsung berlaku.`,
+      });
+    } catch (err) {
+      setPengaturan((sekarang) =>
+        sekarang ? { ...sekarang, [kunci]: nilaiLama } : sekarang
+      );
+      toast.error("Gagal mengubah saklar", {
+        description: err instanceof Error ? err.message : "Terjadi kendala jaringan.",
+      });
+    } finally {
+      setMenyimpanSaklar(null);
     }
   };
 
@@ -253,9 +297,18 @@ export default function AdminKontenPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {kunciGrup.map(([kunci, def]) => {
-                    const nilai = pengaturan[kunci as keyof Pengaturan] ?? "";
+                    const kunciSetting = kunci as keyof Pengaturan;
+                    const nilai = pengaturan[kunciSetting] ?? "";
                     const ubah = (v: string) =>
-                      setPengaturan({ ...pengaturan, [kunci]: v });
+                      setPengaturan((sekarang) =>
+                        sekarang ? { ...sekarang, [kunci]: v } : sekarang
+                      );
+                    const rutePratayang =
+                      kunci === "tampilan.dashboard"
+                        ? { href: "/dashboard", nama: "Dashboard Data" }
+                        : kunci === "tampilan.sinta"
+                          ? { href: "/sinta", nama: "Sinta" }
+                          : null;
 
                     return (
                       <div
@@ -269,16 +322,23 @@ export default function AdminKontenPage() {
                         {def.jenis === "saklar" ? (
                           <button
                             type="button"
-                            onClick={() => ubah(nilai === "1" ? "0" : "1")}
+                            onClick={() => void simpanSaklar(kunciSetting, nilai)}
+                            disabled={menyimpanSaklar !== null}
+                            aria-pressed={nilai === "1"}
+                            aria-busy={menyimpanSaklar === kunciSetting}
                             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-colors ${
                               nilai === "1"
                                 ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300"
                                 : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"
-                            }`}
+                            } disabled:cursor-wait disabled:opacity-70`}
                           >
                             <span className="flex items-center gap-2">
                               {nilai === "1" ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                              {nilai === "1" ? "Ditampilkan" : "Disembunyikan"}
+                              {menyimpanSaklar === kunciSetting
+                                ? "Menyimpan..."
+                                : nilai === "1"
+                                  ? "Ditampilkan"
+                                  : "Disembunyikan"}
                             </span>
                             <span
                               className={`w-10 h-5 rounded-full p-0.5 transition-colors ${
@@ -324,6 +384,18 @@ export default function AdminKontenPage() {
                           <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                             {def.bantuan}
                           </p>
+                        )}
+
+                        {rutePratayang && (
+                          <a
+                            href={rutePratayang.href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-700 transition-colors hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            {nilai === "1" ? "Buka" : "Pratayang"} {rutePratayang.nama}
+                          </a>
                         )}
                       </div>
                     );

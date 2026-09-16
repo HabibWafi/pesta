@@ -1,4 +1,4 @@
-import { unstable_cache, revalidateTag } from "next/cache";
+import { revalidatePath, unstable_cache, revalidateTag } from "next/cache";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { faqs, testimonials, type Faq, type Testimonial } from "@/lib/db/schema";
@@ -57,4 +57,7 @@ export const ambilFaq = unstable_cache(
  */
 export function segarkanKonten(): void {
   revalidateTag("konten", { expire: 0 });
+  revalidatePath("/", "page");
+  revalidatePath("/dashboard", "page");
+  revalidatePath("/sinta", "page");
 }

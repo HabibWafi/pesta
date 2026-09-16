@@ -2,6 +2,12 @@ import HomeClient from "@/components/HomeClient";
 import { ambilPengaturan, ambilTestimoni, ambilFaq, aktif } from "@/lib/content";
 import { komponenWib } from "@/lib/waktu";
 
+// Status fitur berasal dari database dan dapat berubah dari panel admin.
+// Render per permintaan mencegah HTML halaman utama lama menahan navigasi
+// Dashboard setelah saklarnya diaktifkan. Query konten tetap memakai cache
+// bertag, jadi perubahan ini tidak menambah query MySQL pada tiap kunjungan.
+export const dynamic = "force-dynamic";
+
 /**
  * Halaman utama PESTA.
  *

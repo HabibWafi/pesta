@@ -8,7 +8,12 @@ import {
   X 
 } from "lucide-react";
 
-export default function Navbar() {
+interface NavbarProps {
+  /** Tautan hanya muncul setelah fitur benar-benar diaktifkan oleh admin. */
+  tampilDashboard?: boolean;
+}
+
+export default function Navbar({ tampilDashboard = false }: NavbarProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -28,6 +33,7 @@ export default function Navbar() {
     { name: "Beranda", href: "#hero" },
     { name: "Layanan", href: "#layanan" },
     { name: "Integrasi", href: "#layanan-khusus" },
+    ...(tampilDashboard ? [{ name: "Dashboard", href: "/dashboard" }] : []),
     { name: "ViDCon", href: "#vidcon" },
     { name: "Dokumentasi", href: "#dokumentasi" },
     { name: "Nol Rupiah", href: "#nol-rupiah" },
@@ -73,20 +79,20 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1 bg-slate-100/80 p-1.5 rounded-full border border-slate-200/60 backdrop-blur-md">
+          <nav className="hidden xl:flex items-center gap-1 bg-slate-100/80 p-1.5 rounded-full border border-slate-200/60 backdrop-blur-md">
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.name}
                 href={link.href}
                 className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-indigo-600 hover:bg-white rounded-full transition-all duration-200"
               >
                 {link.name}
-              </a>
+              </Link>
             ))}
           </nav>
 
           {/* Mobile Menu Toggle Button */}
-          <div className="md:hidden flex items-center">
+          <div className="xl:hidden flex items-center">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors"
@@ -106,7 +112,7 @@ export default function Navbar() {
         menu ini.
       */}
       <div
-        className={`md:hidden grid transition-all duration-300 ease-out ${
+        className={`xl:hidden grid transition-all duration-300 ease-out ${
           mobileMenuOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
         }`}
         aria-hidden={!mobileMenuOpen}
@@ -115,14 +121,14 @@ export default function Navbar() {
           <div className="bg-white/95 backdrop-blur-xl border-b border-slate-200 px-4 pt-4 pb-6 mt-3 shadow-xl">
             <div className="flex flex-col gap-2">
               {navLinks.map((link) => (
-                <a
+                <Link
                   key={link.name}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className="px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-indigo-600 rounded-xl transition-colors"
                 >
                   {link.name}
-                </a>
+                </Link>
               ))}
             </div>
           </div>

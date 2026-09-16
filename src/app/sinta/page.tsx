@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { keadaanFitur, metadataFitur, PitaPratayang } from "@/components/PratayangBelumTayang";
 import SintaClient from "./SintaClient";
 
+// Sama seperti Dashboard, akses pratayang bergantung pada cookie admin dan
+// saklar database sehingga tidak aman bila HTML-nya disimpan sebagai statis.
+export const dynamic = "force-dynamic";
+
 /**
  * Sinta masih dikembangkan, jadi halamannya dijaga saklar
  * `tampilan.sinta` di /admin/konten.

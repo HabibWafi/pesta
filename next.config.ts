@@ -70,11 +70,45 @@ const nextConfig: NextConfig = {
          * seketika dari cache, sementara CDN menyegarkan diri di latar. Sama
          * dengan yang sudah dipakai halaman depan.
          */
-        source: "/:path((?!_next|api|admin).*)",
+        source: "/:path((?!_next|api|admin|dashboard|sinta).*)",
         headers: [
           {
             key: "Cache-Control",
             value: "public, s-maxage=300, stale-while-revalidate=3600",
+          },
+        ],
+      },
+      {
+        /**
+         * Ketiga halaman ini memuat saklar fitur dari database. Cache CDN
+         * tidak ikut dibersihkan oleh revalidateTag/revalidatePath, sehingga
+         * pernah menyajikan 404 Dashboard lama setelah admin mengaktifkannya.
+         * Jangan simpan HTML-nya; query database di dalamnya tetap memakai
+         * cache bertag agar batas Entry Process Hostinger tetap terjaga.
+         */
+        source: "/",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-cache, no-store, max-age=0, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/dashboard",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-cache, no-store, max-age=0, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/sinta",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-cache, no-store, max-age=0, must-revalidate",
           },
         ],
       },
