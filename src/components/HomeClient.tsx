@@ -79,7 +79,7 @@ export default function HomeClient({ konten }: { konten: KontenLanding }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 selection:bg-indigo-500 selection:text-white">
-      <Navbar />
+      <Navbar tampilDashboard={konten.tampilDashboard} />
 
       <main className="flex-grow">
         <HeroSection

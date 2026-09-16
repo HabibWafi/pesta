@@ -153,8 +153,9 @@ export const DEFINISI_SETTING = {
     label: "Tampilkan Dashboard Data",
     jenis: "saklar",
     bantuan:
-      "Masih dikembangkan. Selama mati, halaman /dashboard tidak bisa dibuka warga - " +
-      "petugas yang login tetap bisa memeriksanya lebih dulu.",
+      "Perubahan saklar tersimpan langsung. Saat aktif, tautan Dashboard muncul di " +
+      "navigasi dan halaman /dashboard dapat dibuka warga. Petugas tetap dapat " +
+      "membuka pratayang saat saklar dimatikan.",
     bawaan: "0",
   },
 

@@ -64,6 +64,17 @@ export async function metadataFitur(kunci: KunciFitur, judul: string) {
   const pengaturan = await ambilPengaturan();
   if (aktif(pengaturan[kunci])) return { title: judul };
 
+  // Petugas yang sedang login memperoleh judul pratayang yang jujur. Isi
+  // halaman sebelumnya sudah dapat dilihat petugas, tetapi judul tab tetap
+  // "Halaman Tidak Ditemukan" sehingga pratayang terlihat seperti gagal.
+  // Tetap noindex karena fitur ini belum diterbitkan untuk warga.
+  if (await getAdminSession()) {
+    return {
+      title: `Pratayang - ${judul}`,
+      robots: { index: false, follow: false, nocache: true },
+    };
+  }
+
   /*
    * Judulnya ikut dinetralkan, bukan hanya isinya.
    *
