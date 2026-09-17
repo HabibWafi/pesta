@@ -27,6 +27,7 @@ const env = Object.fromEntries(
 const API_KEY = env.BEREGAM_API_KEY;
 const HMAC = env.BEREGAM_WEBHOOK_HMAC;
 const NOMOR = "6281299887766@c.us";
+const NOMOR_PROAKTIF = "6281299887755@c.us";
 
 // Tanggal uji harus selalu valid. Nilai tetap pernah membuat seluruh bagian
 // formulir gagal begitu kalender melewati tanggal tersebut.
@@ -133,6 +134,7 @@ async function worker(path, opsi = {}) {
 
 function bersihkan() {
   sql(`DELETE FROM pesta.beregam_contacts WHERE wa_id='${NOMOR}';`);
+  sql(`DELETE FROM pesta.beregam_contacts WHERE wa_id='${NOMOR_PROAKTIF}';`);
   sql(`DELETE FROM pesta.beregam_alerts WHERE 1=1;`);
   // Formulir layanan lewat chat (bagian O) - tidak berelasi FK ke
   // beregam_contacts, jadi harus dibersihkan terpisah lewat nama uji.
@@ -250,6 +252,67 @@ async function main() {
 
   // === F. Balasan admin dari HP (fromMe) ==================================
   console.log("\nF. BALASAN ADMIN DARI HP");
+
+  // Regresi utama: petugas mengirim lebih dahulu ke nomor yang belum pernah
+  // menghubungi bot. Dulu tidak ada sesi sehingga mode manual tidak pernah
+  // aktif; ketika warga membalas, menu bot ikut menyela percakapan petugas.
+  await webhook(
+    pesanWa("Selamat siang, kami menindaklanjuti permohonan Anda", {
+      from: NOMOR_PROAKTIF,
+      fromMe: true,
+      pushName: "Warga Uji Proaktif",
+    })
+  );
+  await jeda(400);
+  const kontakProaktifId = sql(
+    `SELECT id FROM pesta.beregam_contacts WHERE wa_id='${NOMOR_PROAKTIF}';`
+  );
+  lapor("pesan pertama dari petugas membuat sesi manual", Boolean(kontakProaktifId) && sql(
+    `SELECT mode FROM pesta.beregam_sessions WHERE contact_id=${kontakProaktifId};`
+  ) === "manual");
+  lapor(
+    "  pesan pertama dari petugas membuat handover aktif",
+    sql(
+      `SELECT COUNT(*) FROM pesta.beregam_handovers WHERE contact_id=${kontakProaktifId} ` +
+        `AND status='claimed';`
+    ) === "1"
+  );
+
+  // Walaupun umurnya melewati timeout lama, handover aktif harus tetap
+  // menahan bot sampai petugas benar-benar menandainya selesai.
+  sql(
+    `UPDATE pesta.beregam_sessions SET last_activity_at=UTC_TIMESTAMP(3) - INTERVAL 3 HOUR ` +
+      `WHERE contact_id=${kontakProaktifId};`
+  );
+  sql(`UPDATE pesta.beregam_health SET maintenance_ran_at=NULL WHERE id=1;`);
+  await worker("/heartbeat", {
+    method: "POST",
+    body: { workerId: "uji-worker-proaktif", waSessionStatus: "WORKING", uptime: 1 },
+  });
+  lapor(
+    "  timeout tidak melepas bot selama handover belum selesai",
+    sql(`SELECT mode FROM pesta.beregam_sessions WHERE contact_id=${kontakProaktifId};`) === "manual"
+  );
+
+  const outboxProaktifSebelum = Number(
+    sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakProaktifId};`)
+  );
+  await webhook(pesanWa("Baik, ada yang ingin saya tanyakan", { from: NOMOR_PROAKTIF }));
+  await jeda(400);
+  lapor(
+    "  balasan warga setelah dihubungi petugas tidak dijawab bot",
+    Number(sql(`SELECT COUNT(*) FROM pesta.beregam_outbox WHERE contact_id=${kontakProaktifId};`)) ===
+      outboxProaktifSebelum
+  );
+
+  // Hapus skenario terpisah agar hitungan global bagian uji berikutnya tidak
+  // ikut memuat antrean notifikasi/handover proaktif ini.
+  sql(`DELETE FROM pesta.beregam_contacts WHERE id=${kontakProaktifId};`);
+  sql(
+    "UPDATE pesta.beregam_health SET maintenance_ran_at=NULL, " +
+      "active_worker_id=NULL, lease_expires_at=NULL WHERE id=1;"
+  );
+
   await webhook(pesanWa("Baik pak, kami bantu ya", { fromMe: true }));
   await jeda(400);
   const agentPhone = sql(`SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakId} AND source='agent_phone';`);
@@ -814,14 +877,15 @@ async function main() {
   );
 
   // Cukup kirim dua baris yang salah saja - sisanya dipakai dari ingatan.
-  await webhook(pesanWa("Email: ralat.uji@email.com\nTanggal: 02-09-2026"));
+  await webhook(pesanWa(`Email: ralat.uji@email.com\nTanggal: ${tanggalUjiTampilan}`));
   await jeda(700);
 
   const ralatId = sql(`SELECT id FROM pesta.vidcon_requests WHERE nama='Warga Uji ViDCon Ralat' ORDER BY id DESC LIMIT 1;`);
   lapor("mengirim HANYA baris yang diralat sudah cukup untuk menyelesaikan formulir", ralatId !== "");
   lapor(
     "  isian lama ikut tersimpan utuh",
-    sql(`SELECT CONCAT(email,'|',tanggal,'|',cakupan) FROM pesta.vidcon_requests WHERE id=${ralatId};`) === "ralat.uji@email.com|2026-09-02|Inflasi"
+    sql(`SELECT CONCAT(email,'|',tanggal,'|',cakupan) FROM pesta.vidcon_requests WHERE id=${ralatId};`) ===
+      `ralat.uji@email.com|${tanggalUjiIso}|Inflasi`
   );
 
   // --- Balasan di luar format: dikirimi format lagi, TIDAK dimarahi -------

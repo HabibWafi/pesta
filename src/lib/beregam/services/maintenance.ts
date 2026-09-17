@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, notExists, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   beregamAiJobs,
@@ -143,15 +143,31 @@ export async function runMaintenance(): Promise<void> {
         and(eq(beregamOutbox.status, "pending"), lt(beregamOutbox.scheduledAt, tambahMenit(-120)))
       );
 
-    // --- 4. Mode manual yang lupa dilepas ---------------------------------
-    // Petugas sering lupa menekan "Selesai". Tanpa ini, kontak tersebut
-    // tidak akan pernah dilayani bot lagi.
+    // --- 4. Mode manual yatim yang lupa dilepas ---------------------------
+    // Handover aktif adalah flag bahwa petugas masih menangani warga. Sesi
+    // seperti itu TIDAK BOLEH dilepas oleh timeout: bot baru boleh aktif lagi
+    // setelah status handover diubah menjadi resolved lewat kendali "Selesai".
+    // Timeout hanya memulihkan sesi manual yatim dari data lama/galat, yaitu
+    // sesi yang tidak punya handover open atau claimed sebagai jalan selesai.
     const menganggur = tambahMenit(-config.manualModeTimeoutMinutes, sekarang);
+    const handoverAktif = db
+      .select({ id: beregamHandovers.id })
+      .from(beregamHandovers)
+      .where(
+        and(
+          eq(beregamHandovers.contactId, beregamSessions.contactId),
+          inArray(beregamHandovers.status, ["open", "claimed"])
+        )
+      );
     const [dilepas] = await db
       .update(beregamSessions)
       .set({ mode: "bot", state: "idle" })
       .where(
-        and(eq(beregamSessions.mode, "manual"), lt(beregamSessions.lastActivityAt, menganggur))
+        and(
+          eq(beregamSessions.mode, "manual"),
+          lt(beregamSessions.lastActivityAt, menganggur),
+          notExists(handoverAktif)
+        )
       );
 
     if (dilepas.affectedRows > 0) {

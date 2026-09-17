@@ -1,6 +1,12 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { beregamContacts, beregamHandovers, type BeregamContact } from "./db/schema";
+import {
+  beregamContacts,
+  beregamHandovers,
+  beregamSessions,
+  type BeregamContact,
+} from "./db/schema";
+import { ambilAtauBuatSesi } from "./db/queries";
 import { getGateway } from "./drivers";
 import { ambilPesan } from "./pesan";
 
@@ -14,6 +20,76 @@ export interface HandoverAktifPetugas {
 
 /** Maksimal baris yang aman ditampilkan dalam satu List Message WhatsApp. */
 const BATAS_DAFTAR = 10;
+
+export interface HasilTahanBotUntukPetugas {
+  handoverId: number;
+  dibuatBaru: boolean;
+}
+
+/**
+ * Menahan bot begitu petugas mengirim pesan kepada warga.
+ *
+ * Fungsi ini sengaja dipakai bersama oleh webhook pesan dari HP dan balasan
+ * dari panel admin. Pesan petugas boleh menjadi pesan PERTAMA dalam sebuah
+ * percakapan; karena itu sesi harus dibuat di sini, bukan diasumsikan sudah
+ * ada akibat pesan masuk sebelumnya.
+ */
+export async function tahanBotUntukPetugas(
+  contactId: number,
+  alasan: string,
+  assignedTo?: number
+): Promise<HasilTahanBotUntukPetugas> {
+  const sesi = await ambilAtauBuatSesi(contactId);
+  const sekarang = new Date();
+
+  await db
+    .update(beregamSessions)
+    .set({
+      mode: "manual",
+      state: "manual",
+      lastActivityAt: sekarang,
+    })
+    .where(eq(beregamSessions.id, sesi.id));
+
+  const [aktif] = await db
+    .select({ id: beregamHandovers.id })
+    .from(beregamHandovers)
+    .where(
+      and(
+        eq(beregamHandovers.contactId, contactId),
+        inArray(beregamHandovers.status, ["open", "claimed"])
+      )
+    )
+    .orderBy(desc(beregamHandovers.id))
+    .limit(1);
+
+  if (aktif) {
+    await db
+      .update(beregamHandovers)
+      .set({
+        status: "claimed",
+        claimedAt: sekarang,
+        ...(assignedTo !== undefined ? { assignedTo } : {}),
+      })
+      .where(eq(beregamHandovers.id, aktif.id));
+
+    return { handoverId: aktif.id, dibuatBaru: false };
+  }
+
+  const [dibuat] = await db
+    .insert(beregamHandovers)
+    .values({
+      contactId,
+      channel: "wa",
+      reason: alasan.slice(0, 150),
+      status: "claimed",
+      assignedTo: assignedTo ?? null,
+      claimedAt: sekarang,
+    })
+    .$returningId();
+
+  return { handoverId: dibuat.id, dibuatBaru: true };
+}
 
 export async function ambilHandoverAktifPetugas(): Promise<HandoverAktifPetugas[]> {
   return db

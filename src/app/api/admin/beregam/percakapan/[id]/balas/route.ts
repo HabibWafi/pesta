@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import * as z from "zod";
 import { db } from "@/lib/db";
-import { beregamContacts, beregamHandovers, beregamSessions } from "@/lib/beregam/db/schema";
+import { beregamContacts } from "@/lib/beregam/db/schema";
 import { getAdminSession } from "@/lib/auth";
 import { getGateway } from "@/lib/beregam/drivers";
+import { tahanBotUntukPetugas } from "@/lib/beregam/kendali-petugas";
 
 const balasSchema = z.object({ pesan: z.string().trim().min(1, "Pesan tidak boleh kosong").max(4000) });
 
@@ -41,26 +42,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       return NextResponse.json({ success: false, message: "Kontak tidak ditemukan" }, { status: 404 });
     }
 
+    // Tahan bot SEBELUM pesan masuk antrean. Selain menutup celah balapan
+    // dengan balasan warga yang sangat cepat, helper ini juga membuat
+    // handover bila petugas memulai percakapan tanpa permintaan sebelumnya.
+    await tahanBotUntukPetugas(
+      kontak.id,
+      "Percakapan dimulai petugas melalui panel PESTA",
+      session.id
+    );
+
     await getGateway().queueText(kontak.id, kontak.waId, data.pesan, {
       source: "agent",
       sentBy: session.id,
     });
-
-    await db
-      .update(beregamSessions)
-      .set({ mode: "manual", state: "manual", lastActivityAt: new Date() })
-      .where(eq(beregamSessions.contactId, kontak.id));
-
-    // Siapa pun yang membalas dianggap yang menangani - termasuk kalau
-    // sebelumnya sudah diklaim petugas lain. Membalas SUDAH TERMASUK
-    // mengklaim; assignedTo mengikuti orang yang benar-benar terakhir
-    // bertindak, bukan cuma yang pertama menekan tombol.
-    await db
-      .update(beregamHandovers)
-      .set({ status: "claimed", assignedTo: session.id, claimedAt: new Date() })
-      .where(
-        and(eq(beregamHandovers.contactId, kontak.id), inArray(beregamHandovers.status, ["open", "claimed"]))
-      );
 
     return NextResponse.json({ success: true, message: "Balasan diantrekan" });
   } catch (error) {
