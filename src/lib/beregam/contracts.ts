@@ -51,6 +51,11 @@ export const HEADER_WEBHOOK_HMAC = "x-webhook-hmac";
  * Sengaja longgar (`passthrough`) karena bentuk persisnya ditentukan engine
  * dan bisa berubah antar versi. Yang divalidasi ketat hanya field yang
  * benar-benar dipakai; sisanya disimpan apa adanya ke kolom `raw`.
+ *
+ * Produksi berlangganan `message.any`, bukan hanya `message`: event
+ * `message` WAHA hanya memuat pesan masuk, sedangkan pesan manual yang
+ * dikirim dari HP pemegang nomor Beregam baru terlihat di `message.any`
+ * sebagai `fromMe: true`.
  */
 export const webhookPayloadSchema = z
   .object({

@@ -62,7 +62,7 @@ let nomorPesan = 0;
 function pesanWa(body, opsi = {}) {
   nomorPesan += 1;
   return {
-    event: "message",
+    event: opsi.event ?? "message",
     session: "default",
     payload: {
       id: opsi.id ?? `UJI_${Date.now()}_${nomorPesan}`,
@@ -260,6 +260,7 @@ async function main() {
     pesanWa("Selamat siang, kami menindaklanjuti permohonan Anda", {
       from: NOMOR_PROAKTIF,
       fromMe: true,
+      event: "message.any",
       pushName: "Warga Uji Proaktif",
     })
   );

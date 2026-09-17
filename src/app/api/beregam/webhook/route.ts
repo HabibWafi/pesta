@@ -60,7 +60,11 @@ export async function POST(req: Request) {
   const chatId = p?.from ?? "";
 
   // LANGKAH 4 - saring yang tidak perlu diproses. Semua dijawab 200.
-  if (data.event && data.event !== "message") {
+  // `message` hanya memuat pesan masuk. Pesan yang dikirim manual dari HP
+  // pemegang nomor Beregam muncul sebagai `message.any` dengan fromMe=true.
+  // Terima keduanya selama masa transisi konfigurasi WAHA; deduplikasi ID di
+  // bawah mencegah pesan masuk diproses dua kali bila keduanya terlangganan.
+  if (data.event && !["message", "message.any"].includes(data.event)) {
     return NextResponse.json({ ok: true, diabaikan: "bukan peristiwa pesan" });
   }
   if (!chatId || !p?.id) {
