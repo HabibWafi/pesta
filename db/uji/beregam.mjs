@@ -28,6 +28,7 @@ const API_KEY = env.BEREGAM_API_KEY;
 const HMAC = env.BEREGAM_WEBHOOK_HMAC;
 const NOMOR = "6281299887766@c.us";
 const NOMOR_PROAKTIF = "6281299887755@c.us";
+const NOMOR_PANTULAN = "6281299887744@c.us";
 
 // Tanggal uji harus selalu valid. Nilai tetap pernah membuat seluruh bagian
 // formulir gagal begitu kalender melewati tanggal tersebut.
@@ -135,6 +136,7 @@ async function worker(path, opsi = {}) {
 function bersihkan() {
   sql(`DELETE FROM pesta.beregam_contacts WHERE wa_id='${NOMOR}';`);
   sql(`DELETE FROM pesta.beregam_contacts WHERE wa_id='${NOMOR_PROAKTIF}';`);
+  sql(`DELETE FROM pesta.beregam_contacts WHERE wa_id='${NOMOR_PANTULAN}';`);
   sql(`DELETE FROM pesta.beregam_alerts WHERE 1=1;`);
   // Formulir layanan lewat chat (bagian O) - tidak berelasi FK ke
   // beregam_contacts, jadi harus dibersihkan terpisah lewat nama uji.
@@ -252,6 +254,125 @@ async function main() {
 
   // === F. Balasan admin dari HP (fromMe) ==================================
   console.log("\nF. BALASAN ADMIN DARI HP");
+
+  // Regresi race ACK: setelah worker menandai outbox `sent`, WAHA masih dapat
+  // memantulkan kiriman yang sama dengan ID lain lewat message.any. Dulu gema
+  // itu disimpan lagi sebagai petugas (HP) dan membuat handover palsu.
+  await webhook(
+    pesanWa("halo", {
+      from: NOMOR_PANTULAN,
+      pushName: "Warga Uji Pantulan",
+    })
+  );
+  await jeda(400);
+  const kontakPantulanId = sql(
+    `SELECT id FROM pesta.beregam_contacts WHERE wa_id='${NOMOR_PANTULAN}';`
+  );
+  sql(
+    `INSERT INTO pesta.beregam_outbox ` +
+      `(contact_id,wa_id,type,payload,status,attempts,locked_at,sent_at,locked_by) VALUES ` +
+      `(${kontakPantulanId},'${NOMOR_PANTULAN}','text',` +
+      `JSON_OBJECT('text','Balasan bot sesudah ACK'),'sent',1,UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),'uji-race-sent');`
+  );
+  await webhook(
+    pesanWa("Balasan bot sesudah ACK", {
+      from: NOMOR_PANTULAN,
+      fromMe: true,
+      event: "message.any",
+      pushName: "Warga Uji Pantulan",
+      id: `UJI_GEMA_BEDA_DARI_ACK_${Date.now()}`,
+    })
+  );
+  await jeda(400);
+  lapor(
+    "gema outbox sent dengan ID berbeda tidak dianggap petugas",
+    sql(
+      `SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakPantulanId} ` +
+        `AND source='agent_phone';`
+    ) === "0" &&
+      sql(
+        `SELECT COUNT(*) FROM pesta.beregam_handovers WHERE contact_id=${kontakPantulanId} ` +
+          `AND status IN ('open','claimed');`
+      ) === "0" &&
+      sql(`SELECT mode FROM pesta.beregam_sessions WHERE contact_id=${kontakPantulanId};`) ===
+        "bot"
+  );
+
+  // Kontak yang sama dan waktunya berdekatan tidak cukup untuk dibuang. Isi
+  // berbeda berarti petugas memang menulis dari HP dan bot harus ditahan.
+  await webhook(
+    pesanWa("Ini benar balasan petugas dari HP", {
+      from: NOMOR_PANTULAN,
+      fromMe: true,
+      event: "message.any",
+      pushName: "Warga Uji Pantulan",
+    })
+  );
+  await jeda(400);
+  lapor(
+    "pesan HP yang isinya berbeda tetap membuat mode manual",
+    sql(
+      `SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakPantulanId} ` +
+        `AND source='agent_phone' AND body='Ini benar balasan petugas dari HP';`
+    ) === "1" &&
+      sql(`SELECT mode FROM pesta.beregam_sessions WHERE contact_id=${kontakPantulanId};`) ===
+        "manual"
+  );
+
+  // Data yang telanjur rusak sebelum perbaikan juga harus dipulihkan oleh
+  // heartbeat: handover palsu ditutup, sesi kembali ke bot, dan hanya salinan
+  // agent_phone yang dihapus. Pesan bot asli tetap menjadi jejak audit.
+  sql(
+    `UPDATE pesta.beregam_handovers SET status='resolved',resolved_at=UTC_TIMESTAMP(3) ` +
+      `WHERE contact_id=${kontakPantulanId} AND status IN ('open','claimed');`
+  );
+  const idPantulanLama = `UJI_PANTULAN_LAMA_${Date.now()}`;
+  sql(
+    `INSERT INTO pesta.beregam_messages ` +
+      `(contact_id,direction,wa_message_id,type,body,source) VALUES ` +
+      `(${kontakPantulanId},'out','${idPantulanLama}_BOT','text','Pesan bot lama yang terganda','bot'),` +
+      `(${kontakPantulanId},'out','${idPantulanLama}_HP','text','Pesan bot lama yang terganda','agent_phone');`
+  );
+  sql(
+    `INSERT INTO pesta.beregam_handovers ` +
+      `(contact_id,channel,reason,status,claimed_at) VALUES ` +
+      `(${kontakPantulanId},'wa','Percakapan dimulai petugas melalui WhatsApp Beregam','claimed',UTC_TIMESTAMP(3));`
+  );
+  sql(
+    `UPDATE pesta.beregam_sessions SET mode='manual',state='manual' ` +
+      `WHERE contact_id=${kontakPantulanId};`
+  );
+  sql(
+    `UPDATE pesta.beregam_health SET maintenance_ran_at=NULL,` +
+      `active_worker_id=NULL,lease_expires_at=NULL WHERE id=1;`
+  );
+  await worker("/heartbeat", {
+    method: "POST",
+    workerId: "uji-pemulihan-pantulan",
+    body: { workerId: "uji-pemulihan-pantulan", waSessionStatus: "WORKING", uptime: 1 },
+  });
+  await jeda(400);
+  lapor(
+    "data lama yang terganda dipulihkan otomatis",
+    sql(
+      `SELECT COUNT(*) FROM pesta.beregam_handovers WHERE contact_id=${kontakPantulanId} ` +
+        `AND status IN ('open','claimed');`
+    ) === "0" &&
+      sql(
+        `SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakPantulanId} ` +
+          `AND body='Pesan bot lama yang terganda' AND source='agent_phone';`
+      ) === "0" &&
+      sql(
+        `SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakPantulanId} ` +
+          `AND body='Pesan bot lama yang terganda' AND source='bot';`
+      ) === "1" &&
+      sql(`SELECT CONCAT(mode,'|',state) FROM pesta.beregam_sessions ` +
+        `WHERE contact_id=${kontakPantulanId};`) === "bot|idle"
+  );
+  sql(
+    `UPDATE pesta.beregam_health SET active_worker_id=NULL,lease_expires_at=NULL WHERE id=1;`
+  );
+  sql(`DELETE FROM pesta.beregam_contacts WHERE id=${kontakPantulanId};`);
 
   // Regresi utama: petugas mengirim lebih dahulu ke nomor yang belum pernah
   // menghubungi bot. Dulu tidak ada sesi sehingga mode manual tidak pernah

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  adaOutboxTerkunciUntukKontak,
+  adalahPantulanOutboxBaru,
   findOrCreateContactByWaId,
   pesanSudahAda,
 } from "@/lib/beregam/db/queries";
@@ -138,13 +138,13 @@ async function proses(
   // -------------------------------------------------------------------------
   if (p.fromMe) {
     // Pesan yang dikirim worker juga muncul sebagai `message.any` fromMe.
-    // Event itu dapat mendahului ACK worker, jadi deduplikasi waMessageId di
-    // atas belum tentu sudah melihatnya. Jangan salah menganggap kiriman bot
-    // sebagai percakapan manual lalu mengunci sesi warga ke mode manual.
+    // Event itu dapat mendahului atau menyusul ACK worker. ID dari event dan
+    // hasil kirim juga tidak selalu sama, jadi cocokkan kontak + isi pesan
+    // terhadap outbox baru yang masih locked atau sudah sent.
     //
     // Nomor petugas selalu kanal notifikasi/kendali, bukan warga yang sedang
     // diajak bicara manual dari HP bot.
-    if (kanalPetugas || (await adaOutboxTerkunciUntukKontak(contact.id))) {
+    if (kanalPetugas || (await adalahPantulanOutboxBaru(contact.id, p.body))) {
       console.info(
         `[beregam] event pesan keluar sistem diabaikan, kontak=${samarkanNomor(contact.phone)}`
       );

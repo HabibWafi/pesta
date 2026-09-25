@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull, lt, notExists, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, notExists, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   beregamAiJobs,
@@ -184,7 +184,108 @@ export async function runMaintenance(): Promise<void> {
       }
     }
 
-    // --- 5. Mode manual yatim yang lupa dilepas ---------------------------
+    // --- 5. Pulihkan handover palsu akibat race ACK ----------------------
+    // Versi lama dapat mencatat satu kiriman worker dua kali: ACK mencatatnya
+    // sebagai bot, sedangkan pantulan message.any dengan ID berbeda tercatat
+    // sebagai agent_phone. Hanya pasangan dengan kontak, isi, dan waktu yang
+    // sama persis yang dibersihkan. Pesan petugas yang isinya berbeda tidak
+    // tersentuh.
+    const kandidatPantulan = await db
+      .select({
+        handoverId: beregamHandovers.id,
+        contactId: beregamHandovers.contactId,
+        pesanId: beregamMessages.id,
+        body: beregamMessages.body,
+        pesanAt: beregamMessages.createdAt,
+      })
+      .from(beregamHandovers)
+      .innerJoin(
+        beregamMessages,
+        and(
+          eq(beregamMessages.contactId, beregamHandovers.contactId),
+          eq(beregamMessages.direction, "out"),
+          eq(beregamMessages.source, "agent_phone")
+        )
+      )
+      .where(
+        and(
+          eq(beregamHandovers.reason, "Percakapan dimulai petugas melalui WhatsApp Beregam"),
+          inArray(beregamHandovers.status, ["open", "claimed"]),
+          isNotNull(beregamMessages.body),
+          sql`abs(timestampdiff(second, ${beregamMessages.createdAt}, ${beregamHandovers.createdAt})) <= 120`
+        )
+      )
+      .orderBy(desc(beregamHandovers.id), desc(beregamMessages.id))
+      .limit(50);
+
+    let pantulanDibersihkan = 0;
+    for (const kandidat of kandidatPantulan) {
+      if (!kandidat.body) continue;
+
+      const [pesanBotAsli] = await db
+        .select({ id: beregamMessages.id })
+        .from(beregamMessages)
+        .where(
+          and(
+            eq(beregamMessages.contactId, kandidat.contactId),
+            eq(beregamMessages.direction, "out"),
+            inArray(beregamMessages.source, ["bot", "faq", "semantic", "sql", "ai"]),
+            eq(beregamMessages.body, kandidat.body),
+            gte(beregamMessages.createdAt, tambahMenit(-2, kandidat.pesanAt)),
+            lte(beregamMessages.createdAt, tambahMenit(2, kandidat.pesanAt))
+          )
+        )
+        .limit(1);
+
+      if (!pesanBotAsli) continue;
+
+      const [ditutup] = await db
+        .update(beregamHandovers)
+        .set({
+          status: "resolved",
+          resolvedAt: sekarang,
+          resolutionNote: "Dibatalkan otomatis: pantulan kiriman bot terbaca sebagai petugas",
+        })
+        .where(
+          and(
+            eq(beregamHandovers.id, kandidat.handoverId),
+            inArray(beregamHandovers.status, ["open", "claimed"])
+          )
+        );
+
+      if (ditutup.affectedRows === 0) continue;
+
+      // Baris agent_phone ini terbukti salinan pesan bot, bukan percakapan
+      // manusia. Hapus agar inbox tidak lagi menampilkan gelembung ganda.
+      await db.delete(beregamMessages).where(eq(beregamMessages.id, kandidat.pesanId));
+
+      const [handoverLain] = await db
+        .select({ id: beregamHandovers.id })
+        .from(beregamHandovers)
+        .where(
+          and(
+            eq(beregamHandovers.contactId, kandidat.contactId),
+            inArray(beregamHandovers.status, ["open", "claimed"])
+          )
+        )
+        .limit(1);
+
+      if (!handoverLain) {
+        await db
+          .update(beregamSessions)
+          .set({ mode: "bot", state: "idle", context: null, missCount: 0 })
+          .where(eq(beregamSessions.contactId, kandidat.contactId));
+      }
+      pantulanDibersihkan += 1;
+    }
+
+    if (pantulanDibersihkan > 0) {
+      console.info(
+        `[beregam] ${pantulanDibersihkan} handover palsu akibat pantulan bot dipulihkan`
+      );
+    }
+
+    // --- 6. Mode manual yatim yang lupa dilepas ---------------------------
     // Handover aktif adalah flag bahwa petugas masih menangani warga. Sesi
     // seperti itu TIDAK BOLEH dilepas oleh timeout: bot baru boleh aktif lagi
     // setelah status handover diubah menjadi resolved lewat kendali "Selesai".
@@ -218,7 +319,7 @@ export async function runMaintenance(): Promise<void> {
       );
     }
 
-    // --- 6. Retensi payload mentah (PDP) ----------------------------------
+    // --- 7. Retensi payload mentah (PDP) ----------------------------------
     // Panduan menyuruh mengosongkan `raw` yang lebih tua dari 90 hari tapi
     // tidak pernah menyebut siapa yang menjalankannya. Ini pelaksananya.
     await db
@@ -231,7 +332,7 @@ export async function runMaintenance(): Promise<void> {
         )
       );
 
-    // --- 7. Penilaian otomatis setelah menganggur di menu ------------------
+    // --- 8. Penilaian otomatis setelah menganggur di menu ------------------
     // Sebelumnya penilaian hanya ditanyakan lewat kata kunci "nilai" atau
     // saat petugas menandai percakapan selesai - percakapan yang berhenti
     // begitu saja di bot (warga membaca jawabannya lalu pergi) tidak pernah

@@ -195,30 +195,52 @@ export async function claimOutboxBatch(
   });
 }
 
+/** Samakan perubahan baris baru dan spasi tepi tanpa melonggarkan isi pesan. */
+function normalisasiPesanKeluar(teks: string): string {
+  return teks.replace(/\r\n?/g, "\n").trim();
+}
+
 /**
- * Apakah worker sedang mengirim pesan sistem untuk kontak ini.
+ * Apakah pesan `fromMe` merupakan pantulan kiriman worker untuk kontak ini.
  *
- * WAHA memancarkan pesan keluar lewat `message.any` sebelum ACK worker
- * selalu sempat tiba. Tanpa pagar ini, webhook dapat salah menganggap pesan
- * bot sebagai balasan manual dari HP dan mengunci sesi ke mode manual.
+ * WAHA dapat memancarkan `message.any` sebelum ATAU sesudah ACK worker.
+ * Karena itu status yang diperiksa bukan hanya `locked`, tetapi juga `sent`.
+ * ID pesan dari event WAHA pun tidak selalu sama dengan ID hasil endpoint
+ * kirim, sehingga identitas yang stabil adalah kontak + isi pesan + waktu.
+ *
+ * Isi wajib cocok persis. Dengan begitu pesan berbeda yang benar-benar
+ * diketik petugas dari HP tetap tercatat sebagai `agent_phone`, meskipun
+ * kebetulan dikirim ketika worker baru saja mengirim pesan bot.
  */
-export async function adaOutboxTerkunciUntukKontak(contactId: number): Promise<boolean> {
-  const [baris] = await db
-    .select({ id: beregamOutbox.id })
+export async function adalahPantulanOutboxBaru(
+  contactId: number,
+  body: string | null | undefined
+): Promise<boolean> {
+  if (!body?.trim()) return false;
+
+  const batasWaktu = tambahMenit(-5, new Date());
+  const baris = await db
+    .select({ payload: beregamOutbox.payload })
     .from(beregamOutbox)
     .where(
       and(
         eq(beregamOutbox.contactId, contactId),
-        eq(beregamOutbox.status, "locked"),
-        // Sama dengan jendela pemulihan lock di maintenance. Satu batch
-        // diproses berurutan dengan jeda anti-blokir, jadi item terakhir
-        // dapat tetap locked lebih dari dua menit ketika engine lambat.
-        gte(beregamOutbox.lockedAt, tambahMenit(-5, new Date()))
+        inArray(beregamOutbox.status, ["locked", "sent"]),
+        or(
+          gte(beregamOutbox.lockedAt, batasWaktu),
+          gte(beregamOutbox.sentAt, batasWaktu)
+        )
       )
     )
-    .limit(1);
+    .orderBy(desc(beregamOutbox.id))
+    .limit(20);
 
-  return Boolean(baris);
+  const pesanMasuk = normalisasiPesanKeluar(body);
+  return baris.some(({ payload }) => {
+    if (!payload || typeof payload !== "object" || !("text" in payload)) return false;
+    const teks = (payload as { text?: unknown }).text;
+    return typeof teks === "string" && normalisasiPesanKeluar(teks) === pesanMasuk;
+  });
 }
 
 /** Pola penguncian yang sama untuk antrean pekerjaan AI. */
