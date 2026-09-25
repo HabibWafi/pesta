@@ -1,34 +1,9 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Atkinson_Hyperlegible } from "next/font/google";
 import { Toaster } from "sonner";
 import PelacakKunjungan from "@/components/PelacakKunjungan";
 import PemulihChunk from "@/components/PemulihChunk";
 import { KUNCI_SIMPANAN } from "@/lib/aksesibilitas";
 import "./globals.css";
-
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  variable: "--font-plus-jakarta",
-  display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
-});
-
-/**
- * Font ramah disleksia, dipakai HANYA saat pengunjung menyalakannya.
- *
- * `preload: false` disengaja: berkasnya tidak ikut diunduh pengunjung yang
- * tidak memakainya. Atkinson Hyperlegible dirancang Braille Institute agar
- * huruf yang bentuknya mirip (I l 1, O 0) tetap bisa dibedakan - berbeda dari
- * mode "font mudah dibaca" versi lama, yang menjanjikan pergantian font tapi
- * sebenarnya hanya melebarkan spasi lalu jatuh ke font sistem.
- */
-const atkinson = Atkinson_Hyperlegible({
-  subsets: ["latin"],
-  variable: "--font-atkinson",
-  weight: ["400", "700"],
-  display: "swap",
-  preload: false,
-});
 
 export const metadata: Metadata = {
   title: "PESTA | Pelayanan Statistik Digital BPS Kabupaten Musi Rawas",
@@ -69,7 +44,7 @@ export default function RootLayout({
   return (
     <html
       lang="id"
-      className={`${plusJakartaSans.variable} ${atkinson.variable} scroll-smooth`}
+      className="scroll-smooth"
       suppressHydrationWarning
     >
       <head>
@@ -103,7 +78,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${plusJakartaSans.className} min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-indigo-500 selection:text-white flex flex-col`}>
+      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-indigo-500 selection:text-white flex flex-col">
         {children}
         <Toaster position="top-right" richColors closeButton />
         <PelacakKunjungan />

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node skrip/build.mjs",
     "start": "next start",
     "lint": "eslint",
     "db:backup": "powershell -NoProfile -ExecutionPolicy Bypass -File db/backup.ps1",

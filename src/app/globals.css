@@ -30,6 +30,7 @@ html {
 body {
   background-color: #f8fafc;
   color: #0f172a;
+  font-family: "Segoe UI", Arial, Helvetica, sans-serif;
   overflow-x: hidden;
 }
 
@@ -234,16 +235,14 @@ html.a11y-jarak-huruf body :where(p, span, li, a, label, h1, h2, h3, h4, h5, h6)
 }
 
 /*
- * Font ramah disleksia.
- *
- * Atkinson Hyperlegible dirancang Braille Institute khusus agar huruf yang
- * bentuknya mirip (I, l, 1 - O, 0) tetap bisa dibedakan. Berbeda dari mode
- * "font mudah dibaca" versi lama, yang hanya melebarkan spasi lalu jatuh ke
- * font sistem - namanya menjanjikan pergantian font yang tidak pernah terjadi.
+ * Font mudah dibaca tanpa unduhan eksternal. Verdana memiliki bentuk huruf
+ * yang lebar dan jarak bawaan yang jelas, lalu jatuh ke font sistem bila tidak
+ * tersedia. Stack lokal menjaga mode ini tetap berfungsi saat jaringan lambat
+ * dan mencegah build bergantung pada layanan font eksternal.
  */
 html.a11y-font-disleksia body,
 html.a11y-font-disleksia body * {
-  font-family: var(--font-atkinson), system-ui, sans-serif !important;
+  font-family: Verdana, Tahoma, Arial, sans-serif !important;
 }
 
 /* --------------------------------------------------------------------------
