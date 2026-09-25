@@ -137,14 +137,21 @@ async function proses(
   // pernah dijawab. Justru itu hal paling bernilai dari sistem ini.
   // -------------------------------------------------------------------------
   if (p.fromMe) {
-    // Pesan yang dikirim worker juga muncul sebagai `message.any` fromMe.
-    // Event itu dapat mendahului atau menyusul ACK worker. ID dari event dan
-    // hasil kirim juga tidak selalu sama, jadi cocokkan kontak + isi pesan
-    // terhadap outbox baru yang masih locked atau sudah sent.
+    // Sumber kebenaran dari WAHA:
+    // - api = dikirim worker/Beregam lewat API
+    // - app = benar-benar diketik petugas dari aplikasi WhatsApp/HP
+    //
+    // Pesan API tidak boleh pernah membuat mode manual. Pencocokan outbox
+    // hanya fallback untuk engine/event lama yang belum membawa `source`.
+    const sumberWaha = p.source;
     //
     // Nomor petugas selalu kanal notifikasi/kendali, bukan warga yang sedang
     // diajak bicara manual dari HP bot.
-    if (kanalPetugas || (await adalahPantulanOutboxBaru(contact.id, p.body))) {
+    if (
+      kanalPetugas ||
+      sumberWaha === "api" ||
+      (sumberWaha !== "app" && (await adalahPantulanOutboxBaru(contact.id, p.body)))
+    ) {
       console.info(
         `[beregam] event pesan keluar sistem diabaikan, kontak=${samarkanNomor(contact.phone)}`
       );

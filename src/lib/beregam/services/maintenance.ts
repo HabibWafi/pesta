@@ -10,7 +10,7 @@ import {
   beregamOutbox,
   beregamSessions,
 } from "../db/schema";
-import { ambilHealth } from "../db/queries";
+import { ambilHealth, pesanSamaDenganPayloadOutbox } from "../db/queries";
 import { getConfig } from "../config";
 import { lebihTuaDari, tambahMenit } from "@/lib/waktu";
 import { getBeregamService } from "./beregam-service";
@@ -196,6 +196,7 @@ export async function runMaintenance(): Promise<void> {
         contactId: beregamHandovers.contactId,
         pesanId: beregamMessages.id,
         body: beregamMessages.body,
+        raw: beregamMessages.raw,
         pesanAt: beregamMessages.createdAt,
       })
       .from(beregamHandovers)
@@ -222,22 +223,34 @@ export async function runMaintenance(): Promise<void> {
     for (const kandidat of kandidatPantulan) {
       if (!kandidat.body) continue;
 
-      const [pesanBotAsli] = await db
-        .select({ id: beregamMessages.id })
-        .from(beregamMessages)
+      const raw = kandidat.raw as { payload?: { source?: unknown } } | null;
+      const sumberWaha = raw?.payload?.source;
+
+      // `app` adalah bukti eksplisit bahwa petugas mengetik dari HP. Jangan
+      // pernah membersihkannya, sekalipun isinya kebetulan sama dengan bot.
+      if (sumberWaha === "app") continue;
+
+      // Data baru membawa source=api sebagai bukti utama. Untuk data lama
+      // yang belum memilikinya, cocokkan body terhadap payload outbox asli,
+      // termasuk bentuk gabungan title+description+footer milik List Message.
+      const outboxSekitar = await db
+        .select({ payload: beregamOutbox.payload })
+        .from(beregamOutbox)
         .where(
           and(
-            eq(beregamMessages.contactId, kandidat.contactId),
-            eq(beregamMessages.direction, "out"),
-            inArray(beregamMessages.source, ["bot", "faq", "semantic", "sql", "ai"]),
-            eq(beregamMessages.body, kandidat.body),
-            gte(beregamMessages.createdAt, tambahMenit(-2, kandidat.pesanAt)),
-            lte(beregamMessages.createdAt, tambahMenit(2, kandidat.pesanAt))
+            eq(beregamOutbox.contactId, kandidat.contactId),
+            eq(beregamOutbox.status, "sent"),
+            gte(beregamOutbox.sentAt, tambahMenit(-2, kandidat.pesanAt)),
+            lte(beregamOutbox.sentAt, tambahMenit(2, kandidat.pesanAt))
           )
         )
-        .limit(1);
+        .orderBy(desc(beregamOutbox.id))
+        .limit(20);
 
-      if (!pesanBotAsli) continue;
+      const cocokDenganOutbox = outboxSekitar.some(({ payload }) =>
+        pesanSamaDenganPayloadOutbox(kandidat.body!, payload)
+      );
+      if (sumberWaha !== "api" && !cocokDenganOutbox) continue;
 
       const [ditutup] = await db
         .update(beregamHandovers)

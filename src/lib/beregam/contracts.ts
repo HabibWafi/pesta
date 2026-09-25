@@ -76,6 +76,15 @@ export const webhookPayloadSchema = z
          * bolong dan inbox terlihat seolah warga tidak pernah dijawab.
          */
         fromMe: z.boolean().optional(),
+        /**
+         * Asal kiriman menurut WAHA pada event `message.any`.
+         *
+         * `api` berarti pesan dikirim worker lewat API WAHA, sedangkan
+         * `app` berarti benar-benar dikirim dari aplikasi WhatsApp/HP.
+         * Ini pembeda utama bot vs petugas; bentuk teks tidak boleh dijadikan
+         * sumber kebenaran karena List Message menambahkan judul dan footer.
+         */
+        source: z.string().optional(),
         body: z.string().optional(),
         type: z.string().optional(),
         /** Detik epoch dari WhatsApp. Dipakai untuk pagar pesan basi. */

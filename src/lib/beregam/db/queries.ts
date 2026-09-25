@@ -200,6 +200,44 @@ function normalisasiPesanKeluar(teks: string): string {
   return teks.replace(/\r\n?/g, "\n").trim();
 }
 
+type PayloadOutbox = {
+  text?: unknown;
+  list?: {
+    title?: unknown;
+    description?: unknown;
+    footer?: unknown;
+  } | null;
+};
+
+/**
+ * Cocokkan body event WAHA dengan seluruh bentuk yang mungkin dikirim worker.
+ *
+ * Untuk teks biasa, body sama dengan `payload.text`. Untuk List Message,
+ * NOWEB memantulkan gabungan title + description + footer, sedangkan ACK
+ * PESTA menyimpan fallback `text`. Keduanya satu kiriman yang sama.
+ */
+export function pesanSamaDenganPayloadOutbox(body: string, payload: unknown): boolean {
+  if (!payload || typeof payload !== "object") return false;
+
+  const data = payload as PayloadOutbox;
+  const kandidat: string[] = [];
+  if (typeof data.text === "string") kandidat.push(data.text);
+
+  const list = data.list;
+  if (list && typeof list === "object") {
+    const title = typeof list.title === "string" ? list.title : "";
+    const description = typeof list.description === "string" ? list.description : "";
+    const footer = typeof list.footer === "string" ? list.footer : "";
+
+    if (description) kandidat.push(description);
+    if (title && description) kandidat.push([title, description].join("\n"));
+    if (title && description && footer) kandidat.push([title, description, footer].join("\n"));
+  }
+
+  const pesanMasuk = normalisasiPesanKeluar(body);
+  return kandidat.some((teks) => normalisasiPesanKeluar(teks) === pesanMasuk);
+}
+
 /**
  * Apakah pesan `fromMe` merupakan pantulan kiriman worker untuk kontak ini.
  *
@@ -235,12 +273,7 @@ export async function adalahPantulanOutboxBaru(
     .orderBy(desc(beregamOutbox.id))
     .limit(20);
 
-  const pesanMasuk = normalisasiPesanKeluar(body);
-  return baris.some(({ payload }) => {
-    if (!payload || typeof payload !== "object" || !("text" in payload)) return false;
-    const teks = (payload as { text?: unknown }).text;
-    return typeof teks === "string" && normalisasiPesanKeluar(teks) === pesanMasuk;
-  });
+  return baris.some(({ payload }) => pesanSamaDenganPayloadOutbox(body, payload));
 }
 
 /** Pola penguncian yang sama untuk antrean pekerjaan AI. */

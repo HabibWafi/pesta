@@ -69,6 +69,7 @@ function pesanWa(body, opsi = {}) {
       id: opsi.id ?? `UJI_${Date.now()}_${nomorPesan}`,
       from: opsi.from ?? NOMOR,
       fromMe: opsi.fromMe ?? false,
+      ...(opsi.source ? { source: opsi.source } : {}),
       body,
       type: opsi.type ?? "text",
       timestamp: Math.floor((opsi.waktuMs ?? Date.now()) / 1000),
@@ -268,14 +269,19 @@ async function main() {
   const kontakPantulanId = sql(
     `SELECT id FROM pesta.beregam_contacts WHERE wa_id='${NOMOR_PANTULAN}';`
   );
+  const deskripsiDaftar = "Mau lihat apa lagi? Balas dengan angka ya:\n1. Jam layanan";
+  const bodyPantulanDaftar =
+    "Menu Layanan Beregam\n" + deskripsiDaftar + "\nBPS Kabupaten Musi Rawas";
   sql(
     `INSERT INTO pesta.beregam_outbox ` +
       `(contact_id,wa_id,type,payload,status,attempts,locked_at,sent_at,locked_by) VALUES ` +
-      `(${kontakPantulanId},'${NOMOR_PANTULAN}','text',` +
-      `JSON_OBJECT('text','Balasan bot sesudah ACK'),'sent',1,UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),'uji-race-sent');`
+      `(${kontakPantulanId},'${NOMOR_PANTULAN}','menu',JSON_OBJECT(` +
+      `'text','${deskripsiDaftar}','list',JSON_OBJECT(` +
+      `'title','Menu Layanan Beregam','description','${deskripsiDaftar}',` +
+      `'footer','BPS Kabupaten Musi Rawas')),'sent',1,UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),'uji-race-sent');`
   );
   await webhook(
-    pesanWa("Balasan bot sesudah ACK", {
+    pesanWa(bodyPantulanDaftar, {
       from: NOMOR_PANTULAN,
       fromMe: true,
       event: "message.any",
@@ -285,7 +291,7 @@ async function main() {
   );
   await jeda(400);
   lapor(
-    "gema outbox sent dengan ID berbeda tidak dianggap petugas",
+    "gema List Message tanpa source tetap dikenali dari struktur outbox",
     sql(
       `SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakPantulanId} ` +
         `AND source='agent_phone';`
@@ -298,22 +304,41 @@ async function main() {
         "bot"
   );
 
-  // Kontak yang sama dan waktunya berdekatan tidak cukup untuk dibuang. Isi
-  // berbeda berarti petugas memang menulis dari HP dan bot harus ditahan.
   await webhook(
-    pesanWa("Ini benar balasan petugas dari HP", {
+    pesanWa("Bentuk pantulan API yang tidak sama dengan fallback", {
       from: NOMOR_PANTULAN,
       fromMe: true,
+      source: "api",
       event: "message.any",
       pushName: "Warga Uji Pantulan",
     })
   );
   await jeda(400);
   lapor(
-    "pesan HP yang isinya berbeda tetap membuat mode manual",
+    "source=api selalu dianggap kiriman bot meski bentuk body berubah",
     sql(
       `SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakPantulanId} ` +
-        `AND source='agent_phone' AND body='Ini benar balasan petugas dari HP';`
+        `AND source='agent_phone';`
+    ) === "0"
+  );
+
+  // `source=app` harus menang atas fallback teks. Bahkan bila petugas sengaja
+  // menyalin isi bot yang sama persis, itu tetap tindakan manual dari HP.
+  await webhook(
+    pesanWa(bodyPantulanDaftar, {
+      from: NOMOR_PANTULAN,
+      fromMe: true,
+      source: "app",
+      event: "message.any",
+      pushName: "Warga Uji Pantulan",
+    })
+  );
+  await jeda(400);
+  lapor(
+    "source=app tetap membuat mode manual walau isinya sama dengan bot",
+    sql(
+      `SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakPantulanId} ` +
+        `AND source='agent_phone';`
     ) === "1" &&
       sql(`SELECT mode FROM pesta.beregam_sessions WHERE contact_id=${kontakPantulanId};`) ===
         "manual"
@@ -327,11 +352,23 @@ async function main() {
       `WHERE contact_id=${kontakPantulanId} AND status IN ('open','claimed');`
   );
   const idPantulanLama = `UJI_PANTULAN_LAMA_${Date.now()}`;
+  const deskripsiLama = "Mau lihat apa lagi? Balas dengan angka ya:\n1. Jam layanan lama";
+  const bodyPantulanLama =
+    "Menu Layanan Beregam\n" + deskripsiLama + "\nBPS Kabupaten Musi Rawas";
   sql(
     `INSERT INTO pesta.beregam_messages ` +
-      `(contact_id,direction,wa_message_id,type,body,source) VALUES ` +
-      `(${kontakPantulanId},'out','${idPantulanLama}_BOT','text','Pesan bot lama yang terganda','bot'),` +
-      `(${kontakPantulanId},'out','${idPantulanLama}_HP','text','Pesan bot lama yang terganda','agent_phone');`
+      `(contact_id,direction,wa_message_id,type,body,source,raw) VALUES ` +
+      `(${kontakPantulanId},'out','${idPantulanLama}_BOT','menu','${deskripsiLama}','bot',NULL),` +
+      `(${kontakPantulanId},'out','${idPantulanLama}_HP','menu','${bodyPantulanLama}',` +
+      `'agent_phone',JSON_OBJECT('payload',JSON_OBJECT('source','api')));`
+  );
+  sql(
+    `INSERT INTO pesta.beregam_outbox ` +
+      `(contact_id,wa_id,type,payload,status,attempts,locked_at,sent_at,locked_by) VALUES ` +
+      `(${kontakPantulanId},'${NOMOR_PANTULAN}','menu',JSON_OBJECT(` +
+      `'text','${deskripsiLama}','list',JSON_OBJECT(` +
+      `'title','Menu Layanan Beregam','description','${deskripsiLama}',` +
+      `'footer','BPS Kabupaten Musi Rawas')),'sent',1,UTC_TIMESTAMP(3),UTC_TIMESTAMP(3),'uji-race-list-lama');`
   );
   sql(
     `INSERT INTO pesta.beregam_handovers ` +
@@ -360,11 +397,11 @@ async function main() {
     ) === "0" &&
       sql(
         `SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakPantulanId} ` +
-          `AND body='Pesan bot lama yang terganda' AND source='agent_phone';`
+          `AND body='${bodyPantulanLama}' AND source='agent_phone';`
       ) === "0" &&
       sql(
         `SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakPantulanId} ` +
-          `AND body='Pesan bot lama yang terganda' AND source='bot';`
+          `AND body='${deskripsiLama}' AND source='bot';`
       ) === "1" &&
       sql(`SELECT CONCAT(mode,'|',state) FROM pesta.beregam_sessions ` +
         `WHERE contact_id=${kontakPantulanId};`) === "bot|idle"
@@ -381,6 +418,7 @@ async function main() {
     pesanWa("Selamat siang, kami menindaklanjuti permohonan Anda", {
       from: NOMOR_PROAKTIF,
       fromMe: true,
+      source: "app",
       event: "message.any",
       pushName: "Warga Uji Proaktif",
     })
@@ -435,7 +473,7 @@ async function main() {
       "active_worker_id=NULL, lease_expires_at=NULL WHERE id=1;"
   );
 
-  await webhook(pesanWa("Baik pak, kami bantu ya", { fromMe: true }));
+  await webhook(pesanWa("Baik pak, kami bantu ya", { fromMe: true, source: "app" }));
   await jeda(400);
   const agentPhone = sql(`SELECT COUNT(*) FROM pesta.beregam_messages WHERE contact_id=${kontakId} AND source='agent_phone';`);
   lapor("balasan dari HP tercatat sebagai agent_phone", agentPhone === "1");
