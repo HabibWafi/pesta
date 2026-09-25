@@ -195,6 +195,32 @@ export async function claimOutboxBatch(
   });
 }
 
+/**
+ * Apakah worker sedang mengirim pesan sistem untuk kontak ini.
+ *
+ * WAHA memancarkan pesan keluar lewat `message.any` sebelum ACK worker
+ * selalu sempat tiba. Tanpa pagar ini, webhook dapat salah menganggap pesan
+ * bot sebagai balasan manual dari HP dan mengunci sesi ke mode manual.
+ */
+export async function adaOutboxTerkunciUntukKontak(contactId: number): Promise<boolean> {
+  const [baris] = await db
+    .select({ id: beregamOutbox.id })
+    .from(beregamOutbox)
+    .where(
+      and(
+        eq(beregamOutbox.contactId, contactId),
+        eq(beregamOutbox.status, "locked"),
+        // Sama dengan jendela pemulihan lock di maintenance. Satu batch
+        // diproses berurutan dengan jeda anti-blokir, jadi item terakhir
+        // dapat tetap locked lebih dari dua menit ketika engine lambat.
+        gte(beregamOutbox.lockedAt, tambahMenit(-5, new Date()))
+      )
+    )
+    .limit(1);
+
+  return Boolean(baris);
+}
+
 /** Pola penguncian yang sama untuk antrean pekerjaan AI. */
 export async function claimAiJobBatch(
   limit: number,

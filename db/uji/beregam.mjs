@@ -555,11 +555,95 @@ async function main() {
       ) >= 2
     );
 
-    // Bentuk ini sama dengan judul baris yang dikirim kembali oleh NOWEB.
+    // Kiriman worker ke nomor petugas juga dipantulkan WAHA sebagai
+    // message.any fromMe. Event dapat tiba sebelum ACK, ketika outbox masih
+    // locked. Itu harus dikenali sebagai pesan sistem, bukan percakapan
+    // manual baru yang membuat handover untuk petugas sendiri.
+    const kontakStaf = sql(
+      `SELECT id FROM pesta.beregam_contacts WHERE wa_id='${nomorStaf}@c.us' LIMIT 1;`
+    );
+    const handoverStafSebelum = Number(
+      sql(
+        `SELECT COUNT(*) FROM pesta.beregam_handovers h JOIN pesta.beregam_contacts c ` +
+          `ON c.id=h.contact_id WHERE c.phone='${nomorStaf}';`
+      )
+    );
+    sql(
+      `INSERT INTO pesta.beregam_outbox ` +
+        `(contact_id,wa_id,type,payload,status,attempts,locked_at,locked_by) VALUES ` +
+        `(${kontakStaf},'${nomorStaf}@c.us','text',JSON_OBJECT('text','Notifikasi sistem uji'),` +
+        `'locked',0,UTC_TIMESTAMP(3),'uji-race-fromme');`
+    );
+    await webhook(
+      pesanWa("Notifikasi sistem uji", {
+        event: "message.any",
+        from: `${nomorStaf}@c.us`,
+        fromMe: true,
+        pushName: "Petugas PST Uji",
+      })
+    );
+    await jeda(500);
+    lapor(
+      "event fromMe milik outbox tidak membuat handover manual baru",
+      Number(
+        sql(
+          `SELECT COUNT(*) FROM pesta.beregam_handovers h JOIN pesta.beregam_contacts c ` +
+            `ON c.id=h.contact_id WHERE c.phone='${nomorStaf}';`
+        )
+      ) === handoverStafSebelum
+    );
+    sql(`DELETE FROM pesta.beregam_outbox WHERE locked_by='uji-race-fromme';`);
+
+    // Data rusak dari versi lama juga harus sembuh sendiri: kontak petugas
+    // tidak boleh menjadi handover warga atau ikut menambah jumlah sesi
+    // manual pada status sistem.
+    sql(
+      `INSERT INTO pesta.beregam_sessions (contact_id,state,mode,last_activity_at) ` +
+        `VALUES (${kontakStaf},'manual','manual',UTC_TIMESTAMP(3)) ` +
+        `ON DUPLICATE KEY UPDATE state='manual',mode='manual',last_activity_at=UTC_TIMESTAMP(3);`
+    );
+    sql(
+      `INSERT INTO pesta.beregam_handovers (contact_id,channel,reason,status,claimed_at) ` +
+        `VALUES (${kontakStaf},'wa','Percakapan palsu kanal petugas','claimed',UTC_TIMESTAMP(3));`
+    );
+    sql(`UPDATE pesta.beregam_health SET maintenance_ran_at=NULL WHERE id=1;`);
+    await worker("/heartbeat", {
+      method: "POST",
+      workerId: "worker-A",
+      body: { workerId: "worker-A", waSessionStatus: "WORKING" },
+    });
+    await jeda(500);
+    lapor(
+      "pemeliharaan menutup handover palsu milik kanal petugas",
+      Number(
+        sql(
+          `SELECT COUNT(*) FROM pesta.beregam_handovers WHERE contact_id=${kontakStaf} ` +
+            `AND status IN ('open','claimed');`
+        )
+      ) === 0
+    );
+    lapor(
+      "  sesi petugas dilepas dari mode manual",
+      sql(`SELECT CONCAT(mode,'|',state) FROM pesta.beregam_sessions WHERE contact_id=${kontakStaf};`) ===
+        "bot|idle"
+    );
+
+    // Bentuk ini sama dengan pilihan List Message yang dikirim kembali oleh
+    // NOWEB: tipenya bukan text/chat dan alamat kontak dapat berupa LID.
     await webhook(
       pesanWa(`${handoverUtama}. Warga Uji`, {
-        from: `${nomorStaf}@c.us`,
-        pushName: "Petugas PST Uji",
+        from: "283746512340001@lid",
+        type: "listResponseMessage",
+        tanpaPushName: true,
+        data: {
+          key: {
+            remoteJid: "283746512340001@lid",
+            remoteJidAlt: `${nomorStaf}@s.whatsapp.net`,
+            fromMe: false,
+            addressingMode: "lid",
+          },
+          pushName: "Petugas PST Uji",
+        },
       })
     );
     await jeda(700);

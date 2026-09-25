@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   beregamContacts,
@@ -9,6 +9,7 @@ import {
 import { ambilAtauBuatSesi } from "./db/queries";
 import { getGateway } from "./drivers";
 import { ambilPesan } from "./pesan";
+import { getConfig } from "./config";
 
 export interface HandoverAktifPetugas {
   id: number;
@@ -92,6 +93,8 @@ export async function tahanBotUntukPetugas(
 }
 
 export async function ambilHandoverAktifPetugas(): Promise<HandoverAktifPetugas[]> {
+  const nomorPetugas = getConfig().staffWaNumber;
+
   return db
     .select({
       id: beregamHandovers.id,
@@ -102,7 +105,14 @@ export async function ambilHandoverAktifPetugas(): Promise<HandoverAktifPetugas[
     })
     .from(beregamHandovers)
     .innerJoin(beregamContacts, eq(beregamContacts.id, beregamHandovers.contactId))
-    .where(inArray(beregamHandovers.status, ["open", "claimed"]))
+    .where(
+      and(
+        inArray(beregamHandovers.status, ["open", "claimed"]),
+        // Kontak notifikasi tidak pernah menjadi warga yang dilayani. Pagar
+        // ini mencegah handover palsu lama tampil di daftar penyelesaian.
+        nomorPetugas ? ne(beregamContacts.phone, nomorPetugas) : undefined
+      )
+    )
     .orderBy(desc(beregamHandovers.id))
     .limit(BATAS_DAFTAR);
 }

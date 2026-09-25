@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { findOrCreateContactByWaId, pesanSudahAda } from "@/lib/beregam/db/queries";
+import {
+  adaOutboxTerkunciUntukKontak,
+  findOrCreateContactByWaId,
+  pesanSudahAda,
+} from "@/lib/beregam/db/queries";
 import { webhookSah, HEADER_WEBHOOK_HMAC } from "@/lib/beregam/auth";
 import { webhookPayloadSchema } from "@/lib/beregam/contracts";
 import { namaProfil, nomorAsli } from "@/lib/beregam/identitas";
@@ -116,6 +120,7 @@ async function proses(
    */
   const nama = namaProfil(p);
   const contact = await findOrCreateContactByWaId(chatId, nama, nomorAsli(p));
+  const kanalPetugas = service.adalahPetugasNotifikasi(contact);
 
   // Umur pesan menurut cap waktu WhatsApp. Dipakai pagar pesan basi.
   const umurMenit = p.timestamp
@@ -132,6 +137,20 @@ async function proses(
   // pernah dijawab. Justru itu hal paling bernilai dari sistem ini.
   // -------------------------------------------------------------------------
   if (p.fromMe) {
+    // Pesan yang dikirim worker juga muncul sebagai `message.any` fromMe.
+    // Event itu dapat mendahului ACK worker, jadi deduplikasi waMessageId di
+    // atas belum tentu sudah melihatnya. Jangan salah menganggap kiriman bot
+    // sebagai percakapan manual lalu mengunci sesi warga ke mode manual.
+    //
+    // Nomor petugas selalu kanal notifikasi/kendali, bukan warga yang sedang
+    // diajak bicara manual dari HP bot.
+    if (kanalPetugas || (await adaOutboxTerkunciUntukKontak(contact.id))) {
+      console.info(
+        `[beregam] event pesan keluar sistem diabaikan, kontak=${samarkanNomor(contact.phone)}`
+      );
+      return;
+    }
+
     await service.catatPesan({
       contactId: contact.id,
       direction: "out",
@@ -188,6 +207,16 @@ async function proses(
 
   // Kontak yang diblokir: dicatat, tidak dibalas.
   if (contact.isBlocked) return;
+
+  // Kanal petugas harus mendahului pemeriksaan tipe pesan. Pilihan List
+  // Message dari NOWEB memakai tipe `listResponseMessage`, bukan text/chat,
+  // tetapi body-nya tetap berisi judul baris seperti "123. Nama Pengguna".
+  // Jika dibiarkan masuk cabang media, pilihan penyelesaian dianggap chat
+  // warga baru dan bot mengirim jawaban yang salah.
+  if (kanalPetugas) {
+    await service.handleIncoming(contact, isiTeks, { stale: basi });
+    return;
+  }
 
   // -------------------------------------------------------------------------
   // PESAN BUKAN TEKS

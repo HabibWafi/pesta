@@ -91,8 +91,22 @@ export class BeregamService {
     teks: string,
     opsi: { stale?: boolean } = {}
   ): Promise<void> {
-    const config = getConfig();
     const bersih = this.normalkan(teks);
+
+    // Nomor notifikasi petugas adalah kanal kendali terpisah. Jangan pernah
+    // membuat sesi chatbot warga untuk nomor ini. Balasan biasa membuka
+    // daftar kendali; pilihan List Message menyelesaikan handover yang tepat.
+    if (this.adalahPetugasNotifikasi(contact)) {
+      if (opsi.stale) return;
+
+      const health = await ambilHealth();
+      if (!health.botEnabled) return;
+
+      await this.tanganiKendaliPetugas(contact, bersih);
+      return;
+    }
+
+    const config = getConfig();
     const sesi = await ambilAtauBuatSesi(contact.id);
 
     // --- LANGKAH 1: saklar darurat -----------------------------------------
@@ -110,14 +124,6 @@ export class BeregamService {
     // balasan atas pertanyaan yang sudah diselesaikan admin berjam-jam lalu.
     if (opsi.stale) {
       await this.sentuhSesi(sesi.id);
-      return;
-    }
-
-    // Nomor notifikasi petugas adalah kanal kendali terpisah. Pesannya tidak
-    // boleh masuk ke menu warga, terlebih bila petugas sedang memilih salah
-    // satu dari beberapa percakapan yang hendak diselesaikan.
-    if (this.adalahPetugasNotifikasi(contact)) {
-      await this.tanganiKendaliPetugas(contact, bersih);
       return;
     }
 
@@ -754,7 +760,7 @@ export class BeregamService {
   // =========================================================================
 
   /** Nomor ini satu-satunya yang boleh memakai perintah kendali petugas. */
-  private adalahPetugasNotifikasi(contact: BeregamContact): boolean {
+  adalahPetugasNotifikasi(contact: BeregamContact): boolean {
     const nomorPetugas = getConfig().staffWaNumber;
     if (!nomorPetugas) return false;
 

@@ -143,7 +143,48 @@ export async function runMaintenance(): Promise<void> {
         and(eq(beregamOutbox.status, "pending"), lt(beregamOutbox.scheduledAt, tambahMenit(-120)))
       );
 
-    // --- 4. Mode manual yatim yang lupa dilepas ---------------------------
+    // --- 4. Bersihkan handover palsu milik kanal petugas -----------------
+    // Sebelum pagar event fromMe ada, notifikasi yang dikirim bot ke nomor
+    // petugas kadang dipantulkan WAHA lebih cepat daripada ACK worker. Event
+    // itu lalu disangka balasan manual dan membuat handover untuk petugas
+    // sendiri. Nomor BEREGAM_STAFF_WA tidak pernah menjadi warga yang
+    // dilayani, jadi seluruh handover aktif miliknya pasti tidak sah.
+    if (config.staffWaNumber) {
+      const kontakPetugas = await db
+        .select({ id: beregamContacts.id })
+        .from(beregamContacts)
+        .where(eq(beregamContacts.phone, config.staffWaNumber));
+      const idKontakPetugas = kontakPetugas.map((kontak) => kontak.id);
+
+      if (idKontakPetugas.length > 0) {
+        const [ditutup] = await db
+          .update(beregamHandovers)
+          .set({
+            status: "resolved",
+            resolvedAt: sekarang,
+            resolutionNote: "Dibatalkan otomatis: kontak adalah kanal kendali petugas",
+          })
+          .where(
+            and(
+              inArray(beregamHandovers.contactId, idKontakPetugas),
+              inArray(beregamHandovers.status, ["open", "claimed"])
+            )
+          );
+
+        await db
+          .update(beregamSessions)
+          .set({ mode: "bot", state: "idle", context: null, missCount: 0 })
+          .where(inArray(beregamSessions.contactId, idKontakPetugas));
+
+        if (ditutup.affectedRows > 0) {
+          console.info(
+            `[beregam] ${ditutup.affectedRows} handover palsu kanal petugas ditutup otomatis`
+          );
+        }
+      }
+    }
+
+    // --- 5. Mode manual yatim yang lupa dilepas ---------------------------
     // Handover aktif adalah flag bahwa petugas masih menangani warga. Sesi
     // seperti itu TIDAK BOLEH dilepas oleh timeout: bot baru boleh aktif lagi
     // setelah status handover diubah menjadi resolved lewat kendali "Selesai".
@@ -177,7 +218,7 @@ export async function runMaintenance(): Promise<void> {
       );
     }
 
-    // --- 5. Retensi payload mentah (PDP) ----------------------------------
+    // --- 6. Retensi payload mentah (PDP) ----------------------------------
     // Panduan menyuruh mengosongkan `raw` yang lebih tua dari 90 hari tapi
     // tidak pernah menyebut siapa yang menjalankannya. Ini pelaksananya.
     await db
@@ -190,7 +231,7 @@ export async function runMaintenance(): Promise<void> {
         )
       );
 
-    // --- 6. Penilaian otomatis setelah menganggur di menu ------------------
+    // --- 7. Penilaian otomatis setelah menganggur di menu ------------------
     // Sebelumnya penilaian hanya ditanyakan lewat kata kunci "nilai" atau
     // saat petugas menandai percakapan selesai - percakapan yang berhenti
     // begitu saja di bot (warga membaca jawabannya lalu pergi) tidak pernah
