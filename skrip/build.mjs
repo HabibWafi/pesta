@@ -6,10 +6,12 @@ import { fileURLToPath } from "node:url";
 /**
  * Hostinger dapat mewariskan NODE_ENV nonstandar ke proses build. Next.js
  * hanya mendukung "development", "production", atau "test"; nilai lain
- * membuat perilaku Turbopack tidak konsisten, terutama pada pemrosesan font.
+ * membuat perilaku bundler tidak konsisten.
  *
  * Jalankan CLI Next melalui Node agar cara ini sama di Windows dan Linux,
- * tanpa menambah dependency seperti cross-env.
+ * tanpa menambah dependency seperti cross-env. Build produksi memakai
+ * Webpack karena proses pembantu Turbopack dihentikan sepihak oleh lingkungan
+ * build Hostinger ketika PostCSS memproses globals.css.
  */
 const nextCli = fileURLToPath(
   new URL("../node_modules/next/dist/bin/next", import.meta.url)
@@ -20,7 +22,7 @@ const nextCli = fileURLToPath(
 // ikut terbaca pada build baru.
 rmSync(resolve(process.cwd(), ".next"), { recursive: true, force: true });
 
-const hasil = spawnSync(process.execPath, [nextCli, "build"], {
+const hasil = spawnSync(process.execPath, [nextCli, "build", "--webpack"], {
   stdio: "inherit",
   env: {
     ...process.env,
