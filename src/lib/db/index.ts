@@ -73,9 +73,60 @@ const globalForDb = globalThis as unknown as {
   pestaPool?: mysql.Pool;
 };
 
-const pool = globalForDb.pestaPool ?? createPool();
-if (process.env.NODE_ENV !== "production") globalForDb.pestaPool = pool;
+let poolAktif: mysql.Pool | undefined;
 
-export const db = drizzle(pool, { schema, mode: "default" });
+/**
+ * Ambil pool hanya ketika query pertama benar-benar dijalankan.
+ *
+ * Next.js mengevaluasi modul Route Handler saat `next build` untuk
+ * mengumpulkan konfigurasi route. Hostinger menyediakan kredensial database
+ * ketika aplikasi berjalan, tetapi tidak selalu pada proses build. Membuat
+ * pool di tingkat modul karena itu membuat deploy gagal sebelum server sempat
+ * dimulai, walaupun route-nya sendiri bersifat dinamis.
+ */
+function getPool(): mysql.Pool {
+  if (poolAktif) return poolAktif;
+  if (globalForDb.pestaPool) {
+    poolAktif = globalForDb.pestaPool;
+    return poolAktif;
+  }
+
+  poolAktif = createPool();
+  if (process.env.NODE_ENV !== "production") globalForDb.pestaPool = poolAktif;
+  return poolAktif;
+}
+
+function createDatabase() {
+  return drizzle(getPool(), { schema, mode: "default" });
+}
+
+type PestaDatabase = ReturnType<typeof createDatabase>;
+let databaseAktif: PestaDatabase | undefined;
+
+function getDatabase(): PestaDatabase {
+  databaseAktif ??= createDatabase();
+  return databaseAktif;
+}
+
+/**
+ * Proxy mempertahankan API `db.select()`, `db.transaction()`, dan seterusnya,
+ * sambil menunda pembacaan environment sampai operasi database pertama.
+ */
+export const db = new Proxy({} as PestaDatabase, {
+  get(_target, properti) {
+    const database = getDatabase();
+    const nilai = Reflect.get(database, properti, database) as unknown;
+    return typeof nilai === "function" ? nilai.bind(database) : nilai;
+  },
+});
+
+/** Pool juga diekspor secara lazy untuk kompatibilitas skrip pemeliharaan. */
+const pool = new Proxy({} as mysql.Pool, {
+  get(_target, properti) {
+    const koneksi = getPool();
+    const nilai = Reflect.get(koneksi, properti, koneksi) as unknown;
+    return typeof nilai === "function" ? nilai.bind(koneksi) : nilai;
+  },
+});
 
 export { pool, schema };
