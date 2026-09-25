@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { rmSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -12,6 +14,11 @@ import { fileURLToPath } from "node:url";
 const nextCli = fileURLToPath(
   new URL("../node_modules/next/dist/bin/next", import.meta.url)
 );
+
+// Hostinger dapat memakai ulang direktori aplikasi antar deployment. Buang
+// hasil Turbopack lama agar modul font atau route dari commit sebelumnya tidak
+// ikut terbaca pada build baru.
+rmSync(resolve(process.cwd(), ".next"), { recursive: true, force: true });
 
 const hasil = spawnSync(process.execPath, [nextCli, "build"], {
   stdio: "inherit",
