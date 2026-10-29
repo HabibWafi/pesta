@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { keadaanFitur, metadataFitur, PitaPratayang } from "@/components/PratayangBelumTayang";
-import { getDashboardCatalog } from "@/lib/dashboard-data/queries";
+import { getDashboardCatalog, getDatasetDetail } from "@/lib/dashboard-data/queries";
+import DashboardOverview from "./DashboardOverview";
 import DashboardClient, { type DashboardInitialSelection } from "./DashboardClient";
 
 // Wajib dinamis karena keputusan tayang/pratayang bergantung pada nilai
@@ -41,6 +42,11 @@ export default async function DashboardPage({
     searchParams,
   ]);
   const datasets = hasilKatalog.datasets;
+  const [age, sex] = await Promise.all([
+    "penduduk-kelompok-umur", "penduduk-jenis-kelamin",
+  ].map((slug) => datasets.some((item) => item.slug === slug)
+    ? getDatasetDetail(slug).catch(() => null)
+    : Promise.resolve(null)));
   const dimensions = Object.fromEntries(Object.entries(rawParams)
     .filter(([key, value]) => key.startsWith("dim.") && key.length > 4 && key.length <= 84 && single(value, 160))
     .map(([key, value]) => [key.slice(4), single(value, 160)!]));
@@ -64,7 +70,9 @@ export default async function DashboardPage({
         initialDatasets={datasets}
         initialSelection={initialSelection}
         initialLoadError={hasilKatalog.gagal}
-      />
+      >
+        <DashboardOverview age={age} sex={sex} />
+      </DashboardClient>
     </>
   );
 }

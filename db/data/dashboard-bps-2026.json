@@ -1,0 +1,39 @@
+{
+  "accessedAt": "2026-10-29",
+  "population": {
+    "year": 2026,
+    "sourceUpdatedAt": "2026-02-20T00:00:00+07:00",
+    "sourceUrl": "https://musirawaskab.bps.go.id/id/statistics-table/3/WVc0MGEyMXBkVFUxY25KeE9HdDZkbTQzWkVkb1p6MDkjMw%3D%3D/population-by-age-groups-and-sex--thousand--in-musi-rawas-regency--2023.html",
+    "sourceTitle": "Jumlah Penduduk Menurut Kelompok Umur dan Jenis Kelamin (ribu jiwa) di Kabupaten Musi Rawas, 2026",
+    "note": "Proyeksi Penduduk Kabupaten/Kota Provinsi Sumatera Selatan 2020-2035 (Hasil Sensus Penduduk 2020). Angka dalam ribu jiwa, dibulatkan satu desimal. Penjumlahan rincian dapat berbeda dari total karena pembulatan. Periode mengikuti tahun yang ditampilkan dalam tabel, bukan tahun pada slug URL.",
+    "total": "419.6",
+    "male": "214.1",
+    "female": "205.4",
+    "ages": [
+      ["0-4", "17.0", "16.3", "33.3"],
+      ["5-9", "17.2", "16.7", "33.8"],
+      ["10-14", "18.9", "18.1", "37.0"],
+      ["15-19", "17.4", "16.2", "33.6"],
+      ["20-24", "16.6", "15.6", "32.2"],
+      ["25-29", "16.2", "15.1", "31.4"],
+      ["30-34", "15.6", "15.3", "30.9"],
+      ["35-39", "15.9", "15.5", "31.5"],
+      ["40-44", "15.6", "15.3", "31.0"],
+      ["45-49", "15.3", "14.9", "30.2"],
+      ["50-54", "14.0", "13.1", "27.1"],
+      ["55-59", "11.0", "10.3", "21.3"],
+      ["60-64", "8.6", "8.3", "16.9"],
+      ["65-69", "6.3", "6.3", "12.7"],
+      ["70-74", "4.5", "4.4", "8.9"],
+      ["75+", "4.0", "4.0", "8.1"]
+    ]
+  },
+  "poverty": {
+    "year": 2024,
+    "sourceUpdatedAt": "2025-05-15T00:00:00+07:00",
+    "count": "57.44",
+    "percent": "13.44",
+    "countUrl": "https://musirawaskab.bps.go.id/id/statistics-table/2/MTEyIzI%3D/jumlah-penduduk-miskin.html",
+    "percentUrl": "https://musirawaskab.bps.go.id/id/statistics-table/2/MTEzIzI%3D/persentase-penduduk-miskin.html"
+  }
+}
