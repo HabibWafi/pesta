@@ -1,0 +1,28 @@
+.root {
+  color-scheme: light;
+}
+
+/* Dashboard tetap cerah saat tema halaman PESTA lain sedang gelap. */
+:global(html.dark) .root :is(input, select, textarea, option) {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+:global(html.dark) .root table thead {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+:global(html.dark) .root table thead th {
+  color: #334155 !important;
+}
+
+:global(html.dark) .root table tbody tr,
+:global(html.dark) .root :global(.border-t) {
+  border-color: #e2e8f0 !important;
+}
+
+:global(html.dark) .root table tbody tr:hover {
+  background-color: #f0f9ff !important;
+}
