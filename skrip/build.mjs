@@ -27,6 +27,9 @@ const hasil = spawnSync(process.execPath, [nextCli, "build", "--webpack"], {
   env: {
     ...process.env,
     NODE_ENV: "production",
+    // Pool Rust SWC ikut dibatasi agar tidak menghabiskan kuota thread hosting.
+    TOKIO_WORKER_THREADS: "1",
+    RAYON_NUM_THREADS: "1",
   },
 });
 

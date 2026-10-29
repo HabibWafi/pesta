@@ -8,6 +8,10 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
   experimental: {
+    // Hostinger mengiklankan banyak CPU, tetapi membatasi jumlah proses.
+    // Batasi worker pengumpulan data halaman agar build tidak terkena SIGABRT.
+    cpus: 2,
+    workerThreads: false,
     /**
      * Memangkas impor pustaka ikon.
      *
